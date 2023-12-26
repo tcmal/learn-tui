@@ -1,35 +1,37 @@
-use std::env;
-
 use anyhow::Result;
-use bblearn_api::Client;
+use app::App;
+use event::{Event, EventHandler};
+use handler::handle_key_events;
+use ratatui::prelude::*;
+use std::io;
+use tui::Tui;
 
-use crate::config::Config;
-
+mod app;
 mod config;
+mod event;
+mod handler;
+mod tui;
 
 fn main() -> Result<()> {
-    env_logger::init();
+    let mut app = App::new()?;
 
-    let client = init_client()?;
+    let backend = CrosstermBackend::new(io::stderr());
+    let terminal = Terminal::new(backend)?;
+    let events = EventHandler::new(250);
+    let mut tui = Tui::new(terminal, events);
 
-    dbg!(client.health()?);
+    tui.init()?;
 
-    Config::from_client(client).save()?;
-
-    Ok(())
-}
-
-fn init_client() -> Result<Client> {
-    match Config::load() {
-        Ok(c) => Ok(Client::with_auth_state(c.creds, c.auth_state).unwrap()),
-        Err(e) => {
-            println!("error loading config: {:?}", e);
-
-            let creds = (
-                env::var("LEARN_USERNAME").unwrap(),
-                env::var("LEARN_PASSWORD").unwrap().into(),
-            );
-            Ok(Client::new(creds))
+    while app.running {
+        tui.draw(&mut app)?;
+        match tui.events.next()? {
+            Event::Tick => (),
+            Event::Key(key_event) => handle_key_events(key_event, &mut app)?,
+            Event::Mouse(_) => {}
+            Event::Resize(_, _) => {}
         }
     }
+
+    tui.exit()?;
+    Ok(())
 }

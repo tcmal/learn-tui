@@ -12,10 +12,10 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_client(client: Client) -> Self {
+    pub fn from_client(client: &Client) -> Self {
         Self {
             auth_state: client.auth_state(),
-            creds: client.creds,
+            creds: client.creds.clone(),
         }
     }
 
