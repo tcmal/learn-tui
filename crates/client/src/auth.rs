@@ -3,7 +3,7 @@
 //! Thank you to @kilolympus and @chaives for figuring out the login process
 //! See: https://git.tardisproject.uk/kilo/echo360-downloader
 use regex::Regex;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::Client;
@@ -69,7 +69,7 @@ impl Client {
     }
 
     fn learn_login(&self) -> Result<(), Error> {
-        // # Initiates the login process
+        // Initiates the login process
         const LEARN_LOGIN_URL: &str = "https://www.learn.ed.ac.uk/auth-saml/saml/login?apId=_175_1&redirectUrl=https%3A%2F%2Fwww.learn.ed.ac.uk%2Fultra";
         const SSO_SAML_URL: &str = "https://idp.ed.ac.uk/idp/profile/SAML2/POST/SSO";
         const LEARN_CALLBACK_URL: &str =
@@ -87,7 +87,7 @@ impl Client {
         };
         let samlreq = &caps[1];
 
-        // # Authn Request
+        // Authn Request
         let text = self
             .http
             .post(SSO_SAML_URL)
@@ -107,10 +107,30 @@ impl Client {
 
         Ok(())
     }
+
+    /// Serialise the auth state, for persistence
+    pub fn auth_state(&self) -> AuthState {
+        let mut ser = Vec::new();
+        self.http
+            .cookie_store()
+            .save_incl_expired_and_nonpersistent_json(&mut ser)
+            .unwrap();
+        AuthState(ser)
+    }
+}
+
+/// Contains cached authentication cookies
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AuthState(pub(crate) Vec<u8>);
+
+impl std::fmt::Debug for AuthState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AuthState (***)")
+    }
 }
 
 /// A password, wrapped so we don't print it by accident
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Password(String);
 impl std::fmt::Debug for Password {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

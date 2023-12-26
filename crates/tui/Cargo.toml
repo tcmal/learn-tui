@@ -8,4 +8,10 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.76"
 bblearn_api = { path = "../client" }
+crossterm = "0.27.0"
 env_logger = "0.10.1"
+ratatui = "0.25.0"
+xdg = "2.5.2"
+
+serde = { workspace = true }
+serde_json = { workspace = true }
