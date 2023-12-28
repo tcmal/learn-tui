@@ -1,10 +1,16 @@
 mod auth;
+pub mod content;
+pub mod course;
+pub mod membership;
+pub mod users;
 
 pub use auth::{AuthState, Credentials, Error as AuthError, Password};
 use cookie_store::CookieStore;
 use serde::Deserialize;
 use thiserror::Error;
 use ureq::{Agent, AgentBuilder};
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub const LEARN_BASE: &str = "https://www.learn.ed.ac.uk/";
 
@@ -59,6 +65,16 @@ impl Client {
             }
             x => x,
         }
+    }
+
+    pub(crate) fn get<T: for<'a> Deserialize<'a>>(&self, url: &str) -> Result<T, Error> {
+        self.with_reattempt_auth(|| {
+            Ok(self
+                .http
+                .get(&format!("{}{}", LEARN_BASE, url))
+                .call()?
+                .into_json()?)
+        })
     }
 
     /// Call server health endpoint

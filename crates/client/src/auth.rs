@@ -144,9 +144,9 @@ impl From<String> for Password {
     }
 }
 
-impl Into<String> for Password {
-    fn into(self) -> String {
-        self.0
+impl From<Password> for String {
+    fn from(val: Password) -> Self {
+        val.0
     }
 }
 

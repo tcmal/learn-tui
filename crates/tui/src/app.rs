@@ -1,38 +1,38 @@
+use std::thread::JoinHandle;
+
 use anyhow::Result;
-use bblearn_api::Client;
-use std::env;
 
-use crate::config::Config;
+use crate::{
+    event::EventLoop,
+    screens::ActivePage,
+    store::{Store, StoreWorker},
+};
 
+/// Holds all application state
 pub struct App {
     pub running: bool,
-    client: Client,
+    pub curr_page: ActivePage,
+    pub store: Store,
+    store_worker_handle: JoinHandle<()>,
 }
 impl App {
-    /// Constructs a new instance of [`App`].
-    pub fn new() -> Result<Self> {
-        let client = match Config::load() {
-            Ok(c) => Client::with_auth_state(c.creds, c.auth_state).unwrap(),
-            Err(e) => {
-                println!("error loading config: {:?}", e);
-
-                let creds = (
-                    env::var("LEARN_USERNAME").unwrap(),
-                    env::var("LEARN_PASSWORD").unwrap().into(),
-                );
-                Client::new(creds)
-            }
-        };
+    pub fn new(events: &EventLoop) -> Result<Self> {
+        let (worker_handle, worker_queue) = StoreWorker::spawn_with(events)?;
 
         Ok(Self {
             running: true,
-            client,
+            curr_page: ActivePage::new()?,
+            store: Store::new(worker_queue),
+            store_worker_handle: worker_handle,
         })
     }
 
-    /// Set running to false to quit the application.
     pub fn quit(&mut self) {
-        Config::from_client(&self.client).save().unwrap();
         self.running = false;
+    }
+
+    pub fn clean_shutdown(self) {
+        self.store.request_quit();
+        self.store_worker_handle.join().unwrap();
     }
 }

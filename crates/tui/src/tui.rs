@@ -1,11 +1,10 @@
 use crate::app::App;
-use crate::event::EventHandler;
+use crate::event::EventLoop;
 use anyhow::Result;
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::backend::Backend;
-use ratatui::prelude::*;
-use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
+
 use ratatui::Terminal;
 use std::io;
 use std::panic;
@@ -19,12 +18,12 @@ pub struct Tui<B: Backend> {
     /// Interface to the Terminal.
     terminal: Terminal<B>,
     /// Terminal event handler.
-    pub events: EventHandler,
+    pub events: EventLoop,
 }
 
 impl<B: Backend> Tui<B> {
     /// Constructs a new instance of [`Tui`].
-    pub fn new(terminal: Terminal<B>, events: EventHandler) -> Self {
+    pub fn new(terminal: Terminal<B>, events: EventLoop) -> Self {
         Self { terminal, events }
     }
 
@@ -53,26 +52,8 @@ impl<B: Backend> Tui<B> {
     /// [`Draw`]: ratatui::Terminal::draw
     /// [`rendering`]: crate::ui:render
     pub fn draw(&mut self, app: &mut App) -> Result<()> {
-        self.terminal.draw(|frame| {
-            frame.render_widget(
-                Paragraph::new(format!(
-                    "This is a tui template.\n\
-                Press `Esc`, `Ctrl-C` or `q` to stop running.\n\
-                Press left and right to increment and decrement the counter respectively.\n\
-                "
-                ))
-                .block(
-                    Block::default()
-                        .title("Template")
-                        .title_alignment(Alignment::Center)
-                        .borders(Borders::ALL)
-                        .border_type(BorderType::Rounded),
-                )
-                .style(Style::default().fg(Color::Cyan).bg(Color::Black))
-                .alignment(Alignment::Center),
-                frame.size(),
-            );
-        })?;
+        self.terminal.draw(|frame| app.draw(frame))?;
+
         Ok(())
     }
 
@@ -93,5 +74,11 @@ impl<B: Backend> Tui<B> {
         Self::reset()?;
         self.terminal.show_cursor()?;
         Ok(())
+    }
+}
+
+impl<B: Backend> Drop for Tui<B> {
+    fn drop(&mut self) {
+        self.exit().unwrap();
     }
 }

@@ -8,10 +8,13 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.76"
 bblearn_api = { path = "../client" }
+bbml = { path = "../bbml" }
 crossterm = "0.27.0"
-env_logger = "0.10.1"
-ratatui = "0.25.0"
+ratatui = { version = "0.25.0", features = ["unstable-rendered-line-info"] }
 xdg = "2.5.2"
 
+log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tui-tree-widget = "0.16.0"
+simplelog = "0.12.1"
