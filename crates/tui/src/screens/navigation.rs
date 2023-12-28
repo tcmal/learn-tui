@@ -83,7 +83,7 @@ impl Page for NavigationPage {
 
                     NavTree::ContentLeaf { content_idx } => {
                         let content = store.content(*content_idx);
-                        let rendered = bbml::render(content.body.as_ref().unwrap());
+                        let rendered = todo!();
                         return Ok(Action::ShowContent(rendered));
                     }
 
@@ -199,7 +199,7 @@ impl NavigationPage {
                             .map(|content_idx| {
                                 let content = store.content(content_idx);
 
-                                if content.has_children.unwrap_or(false) {
+                                if content.is_container() {
                                     NavTree::ContentNode {
                                         content_idx,
                                         children: NavTreeChildren::NotRequested,
@@ -223,9 +223,17 @@ impl NavigationPage {
                 if let Some(new_children) = store.content_children(*content_idx) {
                     *children = NavTreeChildren::Done(
                         new_children
-                            .map(|content_idx| NavTree::ContentNode {
-                                content_idx,
-                                children: NavTreeChildren::NotRequested,
+                            .map(|content_idx| {
+                                let content = store.content(content_idx);
+
+                                if content.is_container() {
+                                    NavTree::ContentNode {
+                                        content_idx,
+                                        children: NavTreeChildren::NotRequested,
+                                    }
+                                } else {
+                                    NavTree::ContentLeaf { content_idx }
+                                }
                             })
                             .collect(),
                     );
@@ -359,7 +367,7 @@ impl NavTree {
                 children: NavTreeChildren::Loading,
             } => TreeItem::new(
                 TreeId::Content(*content_idx),
-                store.course(*content_idx).name.to_string(),
+                store.content(*content_idx).title.to_string(),
                 vec![TreeItem::new_leaf(
                     TreeId::ContentLoading(*content_idx),
                     LOADING,

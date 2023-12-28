@@ -6,6 +6,7 @@ pub mod users;
 
 pub use auth::{AuthState, Credentials, Error as AuthError, Password};
 use cookie_store::CookieStore;
+use log::debug;
 use serde::Deserialize;
 use thiserror::Error;
 use ureq::{Agent, AgentBuilder};
@@ -30,6 +31,9 @@ pub enum Error {
 
     #[error("io error: {}", .0)]
     IOError(#[from] std::io::Error),
+
+    #[error("serde error: {}", .0)]
+    SerdeError(#[from] serde_json::Error),
 }
 
 impl Client {
@@ -69,11 +73,14 @@ impl Client {
 
     pub(crate) fn get<T: for<'a> Deserialize<'a>>(&self, url: &str) -> Result<T, Error> {
         self.with_reattempt_auth(|| {
-            Ok(self
-                .http
-                .get(&format!("{}{}", LEARN_BASE, url))
-                .call()?
-                .into_json()?)
+            let resp = self.http.get(&format!("{}{}", LEARN_BASE, url)).call()?;
+            if log::log_enabled!(log::Level::Debug) {
+                let s = resp.into_string()?;
+                debug!("response: {}", s);
+                Ok(serde_json::from_str(&s)?)
+            } else {
+                Ok(resp.into_json()?)
+            }
         })
     }
 

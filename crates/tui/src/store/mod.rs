@@ -81,7 +81,7 @@ impl Store {
     }
 
     pub fn content_children(&self, content_idx: ContentIdx) -> Option<Range<ContentIdx>> {
-        if !self.content(content_idx).has_children.unwrap_or(false) {
+        if !self.content(content_idx).is_container() {
             return Some(0..0);
         }
 
@@ -90,6 +90,10 @@ impl Store {
 
     pub fn request_content_children(&self, content_idx: ContentIdx) {
         let content = self.content(content_idx);
+        if !content.is_container() {
+            return;
+        }
+
         self.worker_channel
             .send(Message::LoadContentChildren {
                 content_idx,

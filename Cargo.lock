@@ -58,6 +58,7 @@ name = "bblearn_api"
 version = "0.1.0"
 dependencies = [
  "cookie_store",
+ "log",
  "regex",
  "serde",
  "serde_json",

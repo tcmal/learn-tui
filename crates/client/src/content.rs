@@ -1,79 +1,201 @@
-use serde::Deserialize;
+use std::fmt;
+
+use serde::{
+    de::{self, MapAccess, Visitor},
+    Deserialize, Deserializer,
+};
 
 use crate::{Client, Result};
 
-#[derive(Debug, Deserialize)]
+impl Client {
+    pub fn content_children(&self, course_id: &str, content_id: &str) -> Result<Vec<Content>> {
+        Ok(self
+            .get::<ContentChildrenResp>(&format!(
+                "learn/api/public/v1/courses/{}/contents/{}/children",
+                course_id, content_id
+            ))?
+            .results
+            .into_iter()
+            .map(|raw| Content::new(raw, course_id))
+            .collect())
+    }
+
+    pub fn page_text(&self, course_id: &str, content_id: &str) -> Result<String> {
+        todo!()
+    }
+}
+
+/// A piece of content, heavily edited to have some structure.
+/// These act like directory trees within a course.
+#[derive(Debug)]
 pub struct Content {
-    /// The ID of the content.
     pub id: String,
-    /// The ID of the content's parent.
-    #[serde(rename = "parentId")]
-    pub parent_id: Option<String>,
-
-    /// The title or name of this content. Typically shown as the main text to click in the course outline when accessing the content.
-    pub title: String,
-
-    /// The body text associated with this content. This field supports BbML; see <a target='_blank' href='https://docs.anthology.com/docs/rest-apis/learn/advanced/bbml.html'>here</a> for more information.
-    #[serde(rename = "body")]
-    pub body: Option<String>,
-    /// The short description of this content.
-    #[serde(rename = "description")]
-    pub description: Option<String>,
-
-    /// The date this content was created.
-    #[serde(rename = "created")]
-    pub created: Option<String>,
-
-    /// The date this content was modified.
-    #[serde(rename = "modified")]
-    pub modified: Option<String>,
-
-    /// The position of this content within its parent folder. Position values are zero-based (the first element has a position value of zero, not one). Default position is last in the list of child contents under the parent.
-    #[serde(rename = "position")]
-    pub position: Option<i32>,
-
-    /// Indicates whether this content is allowed to have child content items.
-    #[serde(rename = "hasChildren")]
-    pub has_children: Option<bool>,
-    /// Indicates whether this content item has one or more gradebook columns.  Associated gradebook columns can be accessed via /learn/api/public/v1/courses/$courseId/gradebook/columns?contentId=$contentId  **Since**: 3000.11.0
-    #[serde(rename = "hasGradebookColumns")]
-    pub has_gradebook_columns: Option<bool>,
-    /// Indicates whether this content item has one or more associated groups.  Associated groups can be accessed via /learn/api/public/v1/courses/$courseId/contents/$contentId/groups  **Since**: 3100.4.0
-    #[serde(rename = "hasAssociatedGroups")]
-    pub has_associated_groups: Option<bool>,
-
-    #[serde(default = "::std::string::String::new")]
     pub course_id: String,
-    // #[serde(rename = "availability")]
-    // availability: Option<::models::Availability2>,
-    // /// Extended settings specific to this content item's content handler.
-    // #[serde(rename = "contentHandler")]
-    // content_handler: Option<::models::ContentHandler>,
-    // /// A list of Content History entities in representation of the copy process the current content item might have if is an LTI content, ordered from newest to oldest content and its respective source course from which current object is a copy of.
-    // #[serde(rename = "copyHistory")]
-    // copy_history: Option<Vec<::models::ContentCopyHistory>>,
-    // /// A list of links to resources related to this content item. Supported relation types include:  - alternate  **Since**: 3900.0.0
-    // #[serde(rename = "links")]
-    // links: Option<Vec<::models::Link>>,
+
+    pub title: String,
+    pub description: Option<String>,
+    pub link: Option<String>,
+
+    pub payload: ContentPayload,
+}
+
+impl Content {
+    fn new(raw: RawContent, course_id: &str) -> Self {
+        let payload = match raw
+            .content_detail
+            .filter(|d| !matches!(d, ContentDetail::Unknown))
+            .or(raw.content_handler)
+        {
+            Some(ContentDetail::ExternalLink { url }) => ContentPayload::Link(url),
+            Some(ContentDetail::Folder { is_page: true }) => ContentPayload::Page,
+            Some(ContentDetail::Folder { is_page: false }) | Some(ContentDetail::Lesson {}) => {
+                ContentPayload::Folder
+            }
+            Some(ContentDetail::Other(s)) => ContentPayload::Other(s),
+            None => ContentPayload::Other("resource/x-bb-api-is-shit".to_string()),
+            Some(ContentDetail::Unknown) => unreachable!(), // filter arm above
+        };
+
+        Content {
+            id: raw.id,
+            course_id: course_id.to_string(),
+            title: raw.title,
+            description: raw.description,
+            link: raw.body.map(|b| b.web_location), // TODO: sometimes there's a link attribute you can get this out of if theres no body, need to investigate more
+            payload,
+        }
+    }
+
+    pub fn is_container(&self) -> bool {
+        matches!(self.payload, ContentPayload::Folder)
+    }
+}
+
+/// What the content is, and the actual content if it carries it.
+#[derive(Debug)]
+pub enum ContentPayload {
+    /// A link to some website.
+    Link(String),
+
+    /// A folder, with more content inside.
+    Folder,
+
+    /// A page. Use [`Self::page_contents`] to get the actual text.
+    Page,
+
+    /// Something else. The contained string is the content handler, which might be a hint.
+    Other(String),
 }
 
 #[derive(Deserialize)]
 pub struct ContentChildrenResp {
-    results: Vec<Content>,
+    results: Vec<RawContent>,
 }
 
-impl Client {
-    pub fn content_children(&self, course_id: &str, content_id: &str) -> Result<Vec<Content>> {
-        self.get::<ContentChildrenResp>(&format!(
-            "learn/api/public/v1/courses/{}/contents/{}/children",
-            course_id, content_id
-        ))
-        .map(|r| r.results)
-        .map(|mut cs| {
-            for c in cs.iter_mut() {
-                c.course_id = course_id.to_string();
+// so firstly, everything on the blackboard learn api docs site is a lie.
+// content items actually seem to follow this pattern:
+//   - for folders, we get ContentDetail::Folder, with is_page set to false
+//     'lessons' have a different name but seem to basically be folders
+//      with special display options that we ignore
+//   - for pages, we get ContentDetail::Folder, with is_page set to true
+//     if you query its child, you get what im calling a 'content leaf'
+//     content leaves don't have content_detail, just body.
+//   - for links, we get ContentDetail::ExternalLink
+//   - for other stuff, we get different content details, etc.
+#[derive(Debug, Deserialize)]
+struct RawContent {
+    id: String,
+
+    title: String,
+    description: Option<String>,
+
+    body: Option<RawContentBody>,
+    #[serde(rename = "contentDetail")]
+    content_detail: Option<ContentDetail>,
+    // sometimes this just contains the data that would be in content_detail in a different format! fun!
+    #[serde(rename = "contentHandler", deserialize_with = "handler_to_detail")]
+    content_handler: Option<ContentDetail>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawContentBody {
+    #[serde(rename = "rawText")]
+    raw_text: String,
+    #[serde(rename = "webLocation")]
+    web_location: String,
+}
+
+#[derive(Debug, Deserialize)]
+enum ContentDetail {
+    #[serde(rename = "resource/x-bb-externallink")]
+    ExternalLink { url: String },
+
+    #[serde(rename = "resource/x-bb-folder")]
+    Folder { is_page: bool },
+
+    #[serde(rename = "resource/x-bb-lesson")]
+    Lesson,
+
+    #[serde(skip)]
+    Other(String),
+
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawContentHandler {
+    id: String,
+    url: Option<String>,
+    #[serde(rename = "isBbPage")]
+    is_bb_page: Option<bool>,
+}
+
+fn handler_to_detail<'de, D>(deserializer: D) -> Result<Option<ContentDetail>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StringOrStruct;
+
+    impl<'de> Visitor<'de> for StringOrStruct {
+        type Value = Option<ContentDetail>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("string or map")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(ContentDetail::Other(v.to_string())))
+        }
+
+        fn visit_map<M>(self, map: M) -> Result<Self::Value, M::Error>
+        where
+            M: MapAccess<'de>,
+        {
+            let raw: RawContentHandler =
+                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))?;
+
+            match raw {
+                RawContentHandler {
+                    id, url: Some(url), ..
+                } if id == "resource/x-bb-externallink" => {
+                    Ok(Some(ContentDetail::ExternalLink { url }))
+                }
+                RawContentHandler { id, is_bb_page, .. } if id == "resource/x-bb-folder" => {
+                    Ok(Some(ContentDetail::Folder {
+                        is_page: is_bb_page.unwrap_or(false),
+                    }))
+                }
+                RawContentHandler { id, .. } if id == "resource/x-bb-lesson" => {
+                    Ok(Some(ContentDetail::Lesson))
+                }
+                RawContentHandler { id, .. } => Ok(Some(ContentDetail::Other(id))),
             }
-            cs
-        })
+        }
     }
+
+    deserializer.deserialize_any(StringOrStruct)
 }

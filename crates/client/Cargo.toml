@@ -11,5 +11,6 @@ regex = "1.10.2"
 thiserror = "1.0.51"
 ureq = { version = "2.9.1", features = ["json", "cookies"] }
 
+log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
