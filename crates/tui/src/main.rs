@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     WriteLogger::init(
         LevelFilter::Debug,
         simplelog::Config::default(),
-        File::create("my_rust_binary.log").unwrap(),
+        File::create(".learn-tui.log").unwrap(),
     )
     .unwrap();
 
