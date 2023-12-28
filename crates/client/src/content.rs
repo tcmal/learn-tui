@@ -63,17 +63,6 @@ pub struct ContentChildrenResp {
 }
 
 impl Client {
-    pub fn course_content(&self, course_id: &str) -> Result<Content> {
-        self.get::<Content>(&format!(
-            "learn/api/public/v1/courses/{}/contents/ROOT",
-            course_id
-        ))
-        .map(|mut r| {
-            r.course_id = course_id.to_string();
-            r
-        })
-    }
-
     pub fn content_children(&self, course_id: &str, content_id: &str) -> Result<Vec<Content>> {
         self.get::<ContentChildrenResp>(&format!(
             "learn/api/public/v1/courses/{}/contents/{}/children",

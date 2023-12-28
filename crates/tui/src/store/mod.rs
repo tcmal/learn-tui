@@ -4,36 +4,48 @@ use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 mod worker;
 pub use worker::StoreWorker;
 
-pub type CourseId = String;
+pub type CourseIdx = usize;
 pub type ContentIdx = usize;
 
 /// Global data store
 pub struct Store {
-    me: Option<User>,
-    my_courses: Option<Vec<Course>>,
+    me: Option<(User, Vec<Course>)>,
+
     contents: Vec<Content>,
     content_children: HashMap<ContentIdx, Range<ContentIdx>>,
-    course_contents: HashMap<CourseId, ContentIdx>,
+    course_contents: HashMap<CourseIdx, Range<ContentIdx>>,
     worker_channel: Sender<Message>,
 }
 
 /// Requests sent to the worker thread
+#[derive(Debug)]
 pub enum Message {
-    LoadMe,
     Quit,
-    LoadMyCourses(String),
-    LoadCourseContent(String),
-    LoadContentChildren(ContentIdx, CourseId, String),
+    LoadMe,
+    LoadCourseContent {
+        course_idx: CourseIdx,
+        course_id: String,
+    },
+    LoadContentChildren {
+        content_idx: ContentIdx,
+        course_id: String,
+        content_id: String,
+    },
 }
 
 /// Messages received by the app from the worker thread
 #[derive(Debug)]
 pub enum Event {
     Error(anyhow::Error),
-    Me(User),
-    MyCourses(Vec<Course>),
-    CourseContent(String, Content),
-    ContentChildren(ContentIdx, Vec<Content>),
+    Me(User, Vec<Course>),
+    CourseContent {
+        course_idx: CourseIdx,
+        content: Vec<Content>,
+    },
+    ContentChildren {
+        content_idx: ContentIdx,
+        children: Vec<Content>,
+    },
 }
 
 impl Store {
@@ -41,50 +53,31 @@ impl Store {
         Self {
             worker_channel,
             me: Default::default(),
-            my_courses: Default::default(),
             course_contents: Default::default(),
             content_children: Default::default(),
             contents: Default::default(),
         }
     }
 
-    pub fn me(&self) -> Option<&User> {
-        let ret = self.me.as_ref();
-        if ret.is_none() {
-            self.worker_channel.send(Message::LoadMe).unwrap();
-        }
-        ret
-    }
-
     pub fn my_courses(&self) -> Option<&[Course]> {
-        let ret = self.my_courses.as_deref();
-        if ret.is_none() {
-            if let Some(me) = self.me() {
-                self.worker_channel
-                    .send(Message::LoadMyCourses(me.id.clone()))
-                    .unwrap()
-            }
-        }
-        ret
+        self.me.as_ref().map(|(_, courses)| courses.as_slice())
     }
 
-    pub fn course_content(&self, course_id: &CourseId) -> Option<ContentIdx> {
-        let ret = self.course_contents.get(course_id).copied();
-        if ret.is_none() {
-            self.worker_channel
-                .send(Message::LoadCourseContent(course_id.clone()))
-                .unwrap();
-        }
-        ret
+    pub fn request_my_courses(&self) {
+        self.worker_channel.send(Message::LoadMe).unwrap()
     }
 
-    pub fn content(&self, content_idx: ContentIdx) -> &Content {
-        &self.contents[content_idx]
+    pub fn course_content(&self, course_idx: CourseIdx) -> Option<Range<ContentIdx>> {
+        self.course_contents.get(&course_idx).cloned()
     }
 
-    pub fn content_children_loaded(&self, content_idx: ContentIdx) -> bool {
-        !self.content(content_idx).has_children.unwrap_or(false)
-            || self.content_children.contains_key(&content_idx)
+    pub fn request_course_content(&self, course_idx: CourseIdx) {
+        self.worker_channel
+            .send(Message::LoadCourseContent {
+                course_idx,
+                course_id: self.my_courses().unwrap()[course_idx].id.clone(),
+            })
+            .unwrap();
     }
 
     pub fn content_children(&self, content_idx: ContentIdx) -> Option<Range<ContentIdx>> {
@@ -92,30 +85,46 @@ impl Store {
             return Some(0..0);
         }
 
-        let ret = self.content_children.get(&content_idx).cloned();
-        if ret.is_none() {
-            let content = self.content(content_idx);
-            self.worker_channel
-                .send(Message::LoadContentChildren(
-                    content_idx,
-                    content.course_id.clone(),
-                    content.id.clone(),
-                ))
-                .unwrap();
-        }
-        ret
+        self.content_children.get(&content_idx).cloned()
+    }
+
+    pub fn request_content_children(&self, content_idx: ContentIdx) {
+        let content = self.content(content_idx);
+        self.worker_channel
+            .send(Message::LoadContentChildren {
+                content_idx,
+                course_id: content.course_id.clone(),
+                content_id: content.id.clone(),
+            })
+            .unwrap();
+    }
+
+    pub fn content(&self, content_idx: ContentIdx) -> &Content {
+        &self.contents[content_idx]
+    }
+
+    pub fn course(&self, course_idx: CourseIdx) -> &Course {
+        &self.my_courses().unwrap()[course_idx]
     }
 
     pub fn event(&mut self, e: Event) {
         match e {
             Event::Error(e) => panic!("{}", e), // TODO
-            Event::Me(m) => self.me = Some(m),
-            Event::MyCourses(c) => self.my_courses = Some(c),
-            Event::CourseContent(course_id, course_content) => {
-                self.course_contents.insert(course_id, self.contents.len());
-                self.contents.push(course_content);
+            Event::Me(u, cs) => self.me = Some((u, cs)),
+            Event::CourseContent {
+                course_idx,
+                content,
+            } => {
+                self.course_contents.insert(
+                    course_idx,
+                    self.contents.len()..self.contents.len() + content.len(),
+                );
+                self.contents.extend(content);
             }
-            Event::ContentChildren(content_idx, children) => {
+            Event::ContentChildren {
+                content_idx,
+                children,
+            } => {
                 self.content_children.insert(
                     content_idx,
                     self.contents.len()..self.contents.len() + children.len(),

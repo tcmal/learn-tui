@@ -4,16 +4,19 @@ use anyhow::Result;
 
 use crate::{
     event::EventLoop,
-    screens::ActivePage,
+    screens::{ContentPage, NavigationPage},
     store::{Store, StoreWorker},
 };
 
 /// Holds all application state
 pub struct App {
     pub running: bool,
-    pub curr_page: ActivePage,
     pub store: Store,
     store_worker_handle: JoinHandle<()>,
+
+    pub navigation: NavigationPage,
+    pub content: ContentPage,
+    pub content_focused: bool,
 }
 impl App {
     pub fn new(events: &EventLoop) -> Result<Self> {
@@ -21,9 +24,11 @@ impl App {
 
         Ok(Self {
             running: true,
-            curr_page: ActivePage::new()?,
             store: Store::new(worker_queue),
             store_worker_handle: worker_handle,
+            navigation: NavigationPage::default(),
+            content: ContentPage::default(),
+            content_focused: false,
         })
     }
 

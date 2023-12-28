@@ -1,5 +1,6 @@
 use anyhow::Result;
 use bblearn_api::Client;
+use log::debug;
 use std::{
     env,
     sync::mpsc::{channel, Receiver, Sender},
@@ -48,6 +49,7 @@ impl StoreWorker {
 
     fn main(self) {
         while let Ok(msg) = self.msg_recv.recv() {
+            debug!("received message: {:?}", msg);
             if let Message::Quit = msg {
                 break;
             }
@@ -63,21 +65,36 @@ impl StoreWorker {
 
     fn process_msg(&self, msg: Message) -> Result<Event> {
         match msg {
-            Message::LoadMe => Ok(Event::Me(self.client.me()?)),
-            Message::LoadMyCourses(me_id) => Ok(Event::MyCourses(
-                self.client
-                    .user_memberships(&me_id)?
+            Message::LoadMe => {
+                let me = self.client.me()?;
+                let courses = self
+                    .client
+                    .user_memberships(&me.id)?
                     .into_iter()
                     .map(|m| m.course)
-                    .collect(),
-            )),
-            Message::LoadCourseContent(course_id) => {
-                let content = self.client.course_content(&course_id)?;
-                Ok(Event::CourseContent(course_id, content))
+                    .collect();
+                Ok(Event::Me(me, courses))
             }
-            Message::LoadContentChildren(content_idx, course_id, content_id) => {
-                let contents = self.client.content_children(&course_id, &content_id)?;
-                Ok(Event::ContentChildren(content_idx, contents))
+            Message::LoadCourseContent {
+                course_idx,
+                course_id,
+            } => {
+                let content = self.client.content_children(&course_id, "ROOT")?;
+                Ok(Event::CourseContent {
+                    course_idx,
+                    content,
+                })
+            }
+            Message::LoadContentChildren {
+                content_idx,
+                course_id,
+                content_id,
+            } => {
+                let children = self.client.content_children(&course_id, &content_id)?;
+                Ok(Event::ContentChildren {
+                    content_idx,
+                    children,
+                })
             }
             Message::Quit => unreachable!(),
         }

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use app::App;
 use event::{Event, EventLoop};
+use log::debug;
 use ratatui::prelude::*;
 use simplelog::{LevelFilter, WriteLogger};
 use std::{fs::File, io};
@@ -34,7 +35,9 @@ fn main() -> Result<()> {
 
     while app.running {
         tui.draw(&mut app)?;
-        match tui.events.next()? {
+        let next = tui.events.next()?;
+        debug!("received event {:?}", next);
+        match next {
             Event::Key(key_event) => app.handle_key(key_event)?,
             Event::Mouse(_) => {}
             Event::Resize(_, _) => {}
