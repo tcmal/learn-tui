@@ -34,6 +34,9 @@ pub enum Error {
 
     #[error("serde error: {}", .0)]
     SerdeError(#[from] serde_json::Error),
+
+    #[error("content leaf was malformed")]
+    BadContentLeaf,
 }
 
 impl Client {

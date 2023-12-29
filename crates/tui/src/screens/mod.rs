@@ -1,19 +1,20 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{prelude::*, widgets::Paragraph, Frame};
+use ratatui::{prelude::*, Frame};
 
 use crate::{app::App, store::Store};
 
-mod content;
 mod navigation;
+mod viewer;
 
-pub use content::ContentPage;
 pub use navigation::NavigationPage;
+pub use viewer::{Document, ViewerPage};
 
 pub enum Action {
     Exit,
     None,
-    ShowContent(Paragraph<'static>),
+    Show(Document),
+    FocusNavigation,
 }
 
 trait Page {
@@ -30,7 +31,7 @@ impl App {
         .split(frame.size());
 
         self.navigation.draw(&self.store, frame, layout[0]);
-        self.content.draw(&self.store, frame, layout[1]);
+        self.viewer.draw(&self.store, frame, layout[1]);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> Result<()> {
@@ -44,18 +45,19 @@ impl App {
             }
             // Other handlers you could add here.
             _ => {
-                let action = match self.content_focused {
-                    true => self.content.handle_key(&self.store, key),
+                let action = match self.viewer_focused {
+                    true => self.viewer.handle_key(&self.store, key),
                     false => self.navigation.handle_key(&self.store, key),
                 }?;
 
                 match action {
                     Action::None => (),
                     Action::Exit => self.quit(),
-                    Action::ShowContent(p) => {
-                        self.content.set_displaying(p);
-                        self.content_focused = true;
+                    Action::Show(doc) => {
+                        self.viewer.show(doc);
+                        self.viewer_focused = true;
                     }
+                    Action::FocusNavigation => self.viewer_focused = false,
                 };
 
                 Ok(())

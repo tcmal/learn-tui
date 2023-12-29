@@ -1,11 +1,12 @@
 use std::fmt;
 
+use log::debug;
 use serde::{
     de::{self, MapAccess, Visitor},
     Deserialize, Deserializer,
 };
 
-use crate::{Client, Result};
+use crate::{Client, Error, Result};
 
 impl Client {
     pub fn content_children(&self, course_id: &str, content_id: &str) -> Result<Vec<Content>> {
@@ -21,7 +22,22 @@ impl Client {
     }
 
     pub fn page_text(&self, course_id: &str, content_id: &str) -> Result<String> {
-        todo!()
+        let mut results = self
+            .get::<ContentChildrenResp>(&format!(
+                "learn/api/public/v1/courses/{}/contents/{}/children",
+                course_id, content_id
+            ))?
+            .results;
+        if results.len() != 1 {
+            return Err(Error::BadContentLeaf);
+        }
+
+        let result = results.pop().unwrap();
+        let Some(RawContentBody { raw_text, .. }) = result.body else {
+            return Err(Error::BadContentLeaf);
+        };
+
+        Ok(raw_text)
     }
 }
 
@@ -61,7 +77,7 @@ impl Content {
             course_id: course_id.to_string(),
             title: raw.title,
             description: raw.description,
-            link: raw.body.map(|b| b.web_location), // TODO: sometimes there's a link attribute you can get this out of if theres no body, need to investigate more
+            link: raw.body.and_then(|b| b.web_location), // TODO: sometimes there's a link attribute you can get this out of if theres no body, need to investigate more
             payload,
         }
     }
@@ -109,6 +125,8 @@ struct RawContent {
     title: String,
     description: Option<String>,
 
+    // sometimes this is just a string for raw_text!
+    #[serde(deserialize_with = "raw_body_str_or_struct", default = "none")]
     body: Option<RawContentBody>,
     #[serde(rename = "contentDetail")]
     content_detail: Option<ContentDetail>,
@@ -122,7 +140,7 @@ struct RawContentBody {
     #[serde(rename = "rawText")]
     raw_text: String,
     #[serde(rename = "webLocation")]
-    web_location: String,
+    web_location: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -158,7 +176,7 @@ where
     struct StringOrStruct;
 
     impl<'de> Visitor<'de> for StringOrStruct {
-        type Value = Option<ContentDetail>;
+        type Value = ContentDetail;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("string or map")
@@ -168,7 +186,7 @@ where
         where
             E: de::Error,
         {
-            Ok(Some(ContentDetail::Other(v.to_string())))
+            Ok(ContentDetail::Other(v.to_string()))
         }
 
         fn visit_map<M>(self, map: M) -> Result<Self::Value, M::Error>
@@ -181,21 +199,62 @@ where
             match raw {
                 RawContentHandler {
                     id, url: Some(url), ..
-                } if id == "resource/x-bb-externallink" => {
-                    Ok(Some(ContentDetail::ExternalLink { url }))
-                }
+                } if id == "resource/x-bb-externallink" => Ok(ContentDetail::ExternalLink { url }),
                 RawContentHandler { id, is_bb_page, .. } if id == "resource/x-bb-folder" => {
-                    Ok(Some(ContentDetail::Folder {
+                    Ok(ContentDetail::Folder {
                         is_page: is_bb_page.unwrap_or(false),
-                    }))
+                    })
                 }
                 RawContentHandler { id, .. } if id == "resource/x-bb-lesson" => {
-                    Ok(Some(ContentDetail::Lesson))
+                    Ok(ContentDetail::Lesson)
                 }
-                RawContentHandler { id, .. } => Ok(Some(ContentDetail::Other(id))),
+                RawContentHandler { id, .. } => Ok(ContentDetail::Other(id)),
             }
         }
     }
 
-    deserializer.deserialize_any(StringOrStruct)
+    match deserializer.deserialize_any(StringOrStruct) {
+        Ok(v) => Ok(Some(v)),
+        Err(_) => Ok(None),
+    }
+}
+
+fn raw_body_str_or_struct<'de, D>(deserializer: D) -> Result<Option<RawContentBody>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StringOrStruct;
+
+    impl<'de> Visitor<'de> for StringOrStruct {
+        type Value = RawContentBody;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("string or map")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(RawContentBody {
+                raw_text: v.to_string(),
+                web_location: None,
+            })
+        }
+
+        fn visit_map<M>(self, map: M) -> Result<Self::Value, M::Error>
+        where
+            M: MapAccess<'de>,
+        {
+            Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+        }
+    }
+
+    match deserializer.deserialize_any(StringOrStruct) {
+        Ok(v) => Ok(Some(v)),
+        Err(_) => Ok(None),
+    }
+}
+fn none<T>() -> Option<T> {
+    None
 }

@@ -96,6 +96,14 @@ impl StoreWorker {
                     children,
                 })
             }
+            Message::LoadPageText {
+                content_idx,
+                course_id,
+                content_id,
+            } => {
+                let text = self.client.page_text(&course_id, &content_id)?;
+                Ok(Event::PageText { content_idx, text })
+            }
             Message::Quit => unreachable!(),
         }
     }

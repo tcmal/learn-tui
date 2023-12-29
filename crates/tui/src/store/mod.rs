@@ -1,4 +1,8 @@
-use bblearn_api::{content::Content, course::Course, users::User};
+use bblearn_api::{
+    content::{Content, ContentPayload},
+    course::Course,
+    users::User,
+};
 use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 
 mod worker;
@@ -15,6 +19,8 @@ pub struct Store {
     content_children: HashMap<ContentIdx, Range<ContentIdx>>,
     course_contents: HashMap<CourseIdx, Range<ContentIdx>>,
     worker_channel: Sender<Message>,
+
+    page_texts: HashMap<ContentIdx, String>,
 }
 
 /// Requests sent to the worker thread
@@ -27,6 +33,11 @@ pub enum Message {
         course_id: String,
     },
     LoadContentChildren {
+        content_idx: ContentIdx,
+        course_id: String,
+        content_id: String,
+    },
+    LoadPageText {
         content_idx: ContentIdx,
         course_id: String,
         content_id: String,
@@ -46,6 +57,10 @@ pub enum Event {
         content_idx: ContentIdx,
         children: Vec<Content>,
     },
+    PageText {
+        content_idx: ContentIdx,
+        text: String,
+    },
 }
 
 impl Store {
@@ -56,6 +71,7 @@ impl Store {
             course_contents: Default::default(),
             content_children: Default::default(),
             contents: Default::default(),
+            page_texts: Default::default(),
         }
     }
 
@@ -103,6 +119,28 @@ impl Store {
             .unwrap();
     }
 
+    pub fn page_text(&self, content_idx: ContentIdx) -> Option<&str> {
+        if !matches!(self.content(content_idx).payload, ContentPayload::Page) {
+            return Some("");
+        }
+
+        self.page_texts.get(&content_idx).map(|v| v.as_str())
+    }
+
+    pub fn request_page_text(&self, content_idx: ContentIdx) {
+        let content = self.content(content_idx);
+        if !matches!(content.payload, ContentPayload::Page) {
+            return;
+        }
+
+        self.worker_channel
+            .send(Message::LoadPageText {
+                content_idx,
+                course_id: content.course_id.clone(),
+                content_id: content.id.clone(),
+            })
+            .unwrap();
+    }
     pub fn content(&self, content_idx: ContentIdx) -> &Content {
         &self.contents[content_idx]
     }
@@ -134,6 +172,9 @@ impl Store {
                     self.contents.len()..self.contents.len() + children.len(),
                 );
                 self.contents.extend(children);
+            }
+            Event::PageText { content_idx, text } => {
+                self.page_texts.insert(content_idx, text);
             }
         }
     }

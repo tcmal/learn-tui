@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{
     event::EventLoop,
-    screens::{ContentPage, NavigationPage},
+    screens::{NavigationPage, ViewerPage},
     store::{Store, StoreWorker},
 };
 
@@ -15,8 +15,8 @@ pub struct App {
     store_worker_handle: JoinHandle<()>,
 
     pub navigation: NavigationPage,
-    pub content: ContentPage,
-    pub content_focused: bool,
+    pub viewer: ViewerPage,
+    pub viewer_focused: bool,
 }
 impl App {
     pub fn new(events: &EventLoop) -> Result<Self> {
@@ -27,8 +27,8 @@ impl App {
             store: Store::new(worker_queue),
             store_worker_handle: worker_handle,
             navigation: NavigationPage::default(),
-            content: ContentPage::default(),
-            content_focused: false,
+            viewer: ViewerPage::default(),
+            viewer_focused: false,
         })
     }
 

@@ -3,7 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, Frame};
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-use super::{Action, Page};
+use super::{Action, Document, Page};
 use crate::store::{ContentIdx, CourseIdx, Store};
 
 impl Default for TreeId {
@@ -82,9 +82,7 @@ impl Page for NavigationPage {
                     }
 
                     NavTree::ContentLeaf { content_idx } => {
-                        let content = store.content(*content_idx);
-                        let rendered = todo!();
-                        return Ok(Action::ShowContent(rendered));
+                        return Ok(Action::Show(Document::Content(*content_idx)));
                     }
 
                     // do nothing on loading stuff
