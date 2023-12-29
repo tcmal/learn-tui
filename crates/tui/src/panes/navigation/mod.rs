@@ -66,7 +66,7 @@ impl Pane for Navigation {
                         ty,
                         children: children @ NavTreeChildren::NotRequested,
                     } => {
-                        ty.request_children(&store);
+                        ty.request_children(store);
                         *children = NavTreeChildren::Loading;
                         self.tree_state.open(sel);
                         self.cached_view_tree = None;
