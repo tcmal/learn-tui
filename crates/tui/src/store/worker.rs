@@ -4,27 +4,26 @@ use log::debug;
 use std::{
     env,
     sync::mpsc::{channel, Receiver, Sender},
-    thread::JoinHandle,
 };
 
+use super::{Event, LoadRequest};
 use crate::{
-    config::AuthCache,
-    event::{Event as CrateEvent, EventLoop},
+    auth_cache::AuthCache,
+    event::{Event as CrateEvent, EventBus},
 };
-
-use super::{Event, Message};
 
 /// Performs requests it receives from the main thread, and sends the results back.
 pub struct StoreWorker {
     client: Client,
-    msg_recv: Receiver<Message>,
+    msg_recv: Receiver<LoadRequest>,
     event_send: Sender<CrateEvent>,
 }
 
 impl StoreWorker {
-    pub fn spawn_with(events: &EventLoop) -> Result<(JoinHandle<()>, Sender<Message>)> {
+    /// Spawn the store worker on the given event bus, returning a channel to send commands down.
+    pub fn spawn_on(bus: &mut EventBus) -> Result<Sender<LoadRequest>> {
         let client = match AuthCache::load() {
-            Ok(c) => Client::with_auth_state(c.creds, c.auth_state).unwrap(),
+            Ok(c) => c.into_client().unwrap(),
             Err(e) => {
                 println!("error loading config: {:?}", e);
 
@@ -37,35 +36,41 @@ impl StoreWorker {
         };
         let (cmd_send, cmd_recv) = channel();
 
-        let worker = StoreWorker {
-            client,
-            msg_recv: cmd_recv,
-            event_send: events.sender(),
-        };
-        let handle = std::thread::spawn(move || worker.main());
+        bus.spawn("store_worker", move |_, event_send| {
+            // we don't need running because the receiver will raise an error and we'll exit
+            StoreWorker {
+                client,
+                msg_recv: cmd_recv,
+                event_send,
+            }
+            .main()
+        });
 
-        Ok((handle, cmd_send))
+        Ok(cmd_send)
     }
 
     fn main(self) {
         while let Ok(msg) = self.msg_recv.recv() {
             debug!("received message: {:?}", msg);
-            if let Message::Quit = msg {
-                break;
-            }
-            match self.process_msg(msg) {
+            if let Err(e) = match self.process_msg(msg) {
                 Ok(e) => self.event_send.send(CrateEvent::Store(e)),
                 Err(e) => self.event_send.send(CrateEvent::Store(Event::Error(e))),
+            } {
+                debug!("error sending event: {:?}", e);
+                break;
             }
-            .unwrap();
         }
 
-        AuthCache::from_client(&self.client).save().unwrap();
+        debug!("shutting down");
+        debug!(
+            "saving config: {:?}",
+            AuthCache::from_client(&self.client).save()
+        );
     }
 
-    fn process_msg(&self, msg: Message) -> Result<Event> {
+    fn process_msg(&self, msg: LoadRequest) -> Result<Event> {
         match msg {
-            Message::LoadMe => {
+            LoadRequest::Me => {
                 let me = self.client.me()?;
                 let courses = self
                     .client
@@ -75,7 +80,7 @@ impl StoreWorker {
                     .collect();
                 Ok(Event::Me(me, courses))
             }
-            Message::LoadCourseContent {
+            LoadRequest::CourseContent {
                 course_idx,
                 course_id,
             } => {
@@ -85,7 +90,7 @@ impl StoreWorker {
                     content,
                 })
             }
-            Message::LoadContentChildren {
+            LoadRequest::ContentChildren {
                 content_idx,
                 course_id,
                 content_id,
@@ -96,7 +101,7 @@ impl StoreWorker {
                     children,
                 })
             }
-            Message::LoadPageText {
+            LoadRequest::PageText {
                 content_idx,
                 course_id,
                 content_id,
@@ -104,7 +109,6 @@ impl StoreWorker {
                 let text = self.client.page_text(&course_id, &content_id)?;
                 Ok(Event::PageText { content_idx, text })
             }
-            Message::Quit => unreachable!(),
         }
     }
 }

@@ -1,10 +1,13 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use ratatui::{prelude::Rect, Frame};
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-use super::{Action, Document, Page};
-use crate::store::{ContentIdx, CourseIdx, Store};
+use super::{Action, Document, Pane};
+use crate::{
+    event::Event,
+    store::{ContentIdx, CourseIdx, Store},
+};
 
 impl Default for TreeId {
     fn default() -> Self {
@@ -12,14 +15,14 @@ impl Default for TreeId {
     }
 }
 
-#[derive(Default)]
-pub struct NavigationPage {
+#[derive(Debug, Default)]
+pub struct Navigation {
     tree_state: TreeState<TreeId>,
     nav_tree: Vec<NavTree>,
     cached_view_tree: Option<Vec<TreeItem<'static, TreeId>>>,
 }
 
-impl Page for NavigationPage {
+impl Pane for Navigation {
     fn draw(&mut self, store: &Store, frame: &mut Frame, area: Rect) {
         if self.refresh_tree(store) || self.cached_view_tree.is_none() {
             // changed, so refresh view tree
@@ -36,7 +39,11 @@ impl Page for NavigationPage {
         );
     }
 
-    fn handle_key(&mut self, store: &Store, key: KeyEvent) -> Result<Action> {
+    fn handle_event(&mut self, store: &Store, event: Event) -> Result<Action> {
+        let Event::Key(key) = event else {
+            return Ok(Action::None);
+        };
+
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => {
                 return Ok(Action::Exit);
@@ -104,7 +111,7 @@ impl Page for NavigationPage {
     }
 }
 
-impl NavigationPage {
+impl Navigation {
     fn refresh_tree(&mut self, store: &Store) -> bool {
         if self.nav_tree.is_empty() {
             // first call, add courses / loading

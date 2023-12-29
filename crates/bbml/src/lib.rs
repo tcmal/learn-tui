@@ -143,9 +143,9 @@ impl<'a> RenderState<'a> {
             }
             Node::Raw(s) => {
                 let s = s.as_utf8_str();
-                if s.contains("\n") {
+                if s.contains('\n') {
                     RenderResult::Text(
-                        s.split("\n")
+                        s.split('\n')
                             .map(|l| Line::styled(l.trim().to_string(), curr_style))
                             .collect::<Vec<_>>()
                             .into(),
@@ -159,7 +159,7 @@ impl<'a> RenderState<'a> {
     }
 }
 
-fn join_results<'a>(mut results: impl Iterator<Item = RenderResult>) -> RenderResult {
+fn join_results(mut results: impl Iterator<Item = RenderResult>) -> RenderResult {
     let Some(mut out) = results.next() else {
         return RenderResult::Span(Span::raw(""));
     };

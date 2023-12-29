@@ -1,3 +1,4 @@
+use anyhow::Result;
 use bblearn_api::{
     content::{Content, ContentPayload},
     course::Course,
@@ -7,6 +8,8 @@ use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 
 mod worker;
 pub use worker::StoreWorker;
+
+use crate::event::EventBus;
 
 pub type CourseIdx = usize;
 pub type ContentIdx = usize;
@@ -18,26 +21,26 @@ pub struct Store {
     contents: Vec<Content>,
     content_children: HashMap<ContentIdx, Range<ContentIdx>>,
     course_contents: HashMap<CourseIdx, Range<ContentIdx>>,
-    worker_channel: Sender<Message>,
 
     page_texts: HashMap<ContentIdx, String>,
+
+    worker_channel: Sender<LoadRequest>,
 }
 
 /// Requests sent to the worker thread
 #[derive(Debug)]
-pub enum Message {
-    Quit,
-    LoadMe,
-    LoadCourseContent {
+pub enum LoadRequest {
+    Me,
+    CourseContent {
         course_idx: CourseIdx,
         course_id: String,
     },
-    LoadContentChildren {
+    ContentChildren {
         content_idx: ContentIdx,
         course_id: String,
         content_id: String,
     },
-    LoadPageText {
+    PageText {
         content_idx: ContentIdx,
         course_id: String,
         content_id: String,
@@ -64,15 +67,17 @@ pub enum Event {
 }
 
 impl Store {
-    pub fn new(worker_channel: Sender<Message>) -> Self {
-        Self {
+    pub fn new(bus: &mut EventBus) -> Result<Self> {
+        let worker_channel = StoreWorker::spawn_on(bus)?;
+
+        Ok(Self {
             worker_channel,
             me: Default::default(),
             course_contents: Default::default(),
             content_children: Default::default(),
             contents: Default::default(),
             page_texts: Default::default(),
-        }
+        })
     }
 
     pub fn my_courses(&self) -> Option<&[Course]> {
@@ -80,7 +85,7 @@ impl Store {
     }
 
     pub fn request_my_courses(&self) {
-        self.worker_channel.send(Message::LoadMe).unwrap()
+        self.worker_channel.send(LoadRequest::Me).unwrap()
     }
 
     pub fn course_content(&self, course_idx: CourseIdx) -> Option<Range<ContentIdx>> {
@@ -89,7 +94,7 @@ impl Store {
 
     pub fn request_course_content(&self, course_idx: CourseIdx) {
         self.worker_channel
-            .send(Message::LoadCourseContent {
+            .send(LoadRequest::CourseContent {
                 course_idx,
                 course_id: self.my_courses().unwrap()[course_idx].id.clone(),
             })
@@ -111,7 +116,7 @@ impl Store {
         }
 
         self.worker_channel
-            .send(Message::LoadContentChildren {
+            .send(LoadRequest::ContentChildren {
                 content_idx,
                 course_id: content.course_id.clone(),
                 content_id: content.id.clone(),
@@ -134,7 +139,7 @@ impl Store {
         }
 
         self.worker_channel
-            .send(Message::LoadPageText {
+            .send(LoadRequest::PageText {
                 content_idx,
                 course_id: content.course_id.clone(),
                 content_id: content.id.clone(),
@@ -177,9 +182,5 @@ impl Store {
                 self.page_texts.insert(content_idx, text);
             }
         }
-    }
-
-    pub fn request_quit(&self) {
-        self.worker_channel.send(Message::Quit).unwrap();
     }
 }

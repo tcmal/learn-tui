@@ -1,10 +1,8 @@
-use std::fmt;
-
-use log::debug;
 use serde::{
     de::{self, MapAccess, Visitor},
     Deserialize, Deserializer,
 };
+use std::fmt;
 
 use crate::{Client, Error, Result};
 

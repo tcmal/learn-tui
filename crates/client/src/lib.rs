@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err)]
 mod auth;
 pub mod content;
 pub mod course;

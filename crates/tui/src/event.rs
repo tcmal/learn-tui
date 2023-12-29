@@ -1,12 +1,15 @@
 use anyhow::Result;
 use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
+use log::debug;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
+use std::sync::Arc;
 use std::thread;
-
+use std::time::Duration;
 
 use crate::store;
 
-/// Events our TUI may receive
+/// An event our app may receive
 #[derive(Debug)]
 pub enum Event {
     /// Key press.
@@ -22,37 +25,26 @@ pub enum Event {
     Store(store::Event),
 }
 
+/// The event bus aggregates events from multiple threads, and joins them all back when required.
+/// FIXME: We don't actually use our join handles, we just let the threads get cleaned up since we'll exit right after.
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct EventLoop {
+pub struct EventBus {
     sender: mpsc::Sender<Event>,
     receiver: mpsc::Receiver<Event>,
-    term_handler: thread::JoinHandle<()>,
+    running: Arc<AtomicBool>,
+    handles: Vec<thread::JoinHandle<()>>,
 }
 
-impl EventLoop {
-    /// Constructs a new instance of [`EventHandler`].
+impl EventBus {
+    /// Create a new event bus
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::channel();
-        let handler = {
-            let sender = sender.clone();
-            thread::spawn(move || loop {
-                // Poll for terminal events and send them
-                match event::read().expect("unable to read event") {
-                    CrosstermEvent::Key(e) => sender.send(Event::Key(e)),
-                    CrosstermEvent::Mouse(e) => sender.send(Event::Mouse(e)),
-                    CrosstermEvent::Resize(w, h) => sender.send(Event::Resize(w, h)),
-                    CrosstermEvent::FocusGained => Ok(()),
-                    CrosstermEvent::FocusLost => Ok(()),
-                    CrosstermEvent::Paste(_) => unimplemented!(),
-                }
-                .expect("failed to send terminal event")
-            })
-        };
         Self {
             sender,
             receiver,
-            term_handler: handler,
+            running: Arc::new(AtomicBool::new(true)),
+            handles: vec![],
         }
     }
 
@@ -64,8 +56,51 @@ impl EventLoop {
         Ok(self.receiver.recv()?)
     }
 
-    /// Get a channel to send events down.
-    pub fn sender(&self) -> Sender<Event> {
-        self.sender.clone()
+    /// Spawn a new thread that can publish to this event bus
+    pub fn spawn<F>(&mut self, name: impl ToString, f: F)
+    where
+        F: 'static + Send + FnOnce(Arc<AtomicBool>, Sender<Event>),
+    {
+        let sender = self.sender.clone();
+        let running = self.running.clone();
+        self.handles.push(
+            thread::Builder::new()
+                .name(name.to_string())
+                .spawn(move || f(running, sender))
+                .unwrap(),
+        );
+    }
+
+    /// Spawn a thread to publish terminal events to this bus
+    pub fn spawn_terminal_listener(&mut self) {
+        self.spawn("terminal_events", Self::terminal_events)
+    }
+
+    /// Polls for terminal events and sends them to the given sender.
+    fn terminal_events(running: Arc<AtomicBool>, sender: Sender<Event>) {
+        loop {
+            if event::poll(Duration::from_millis(250)).expect("unable to poll for events") {
+                match event::read().expect("unable to read event") {
+                    CrosstermEvent::Key(e) => sender.send(Event::Key(e)),
+                    CrosstermEvent::Mouse(e) => sender.send(Event::Mouse(e)),
+                    CrosstermEvent::Resize(w, h) => sender.send(Event::Resize(w, h)),
+                    _ => Ok(()),
+                }
+                .expect("failed to send terminal event");
+            }
+            if !running.load(Ordering::Relaxed) {
+                break;
+            }
+        }
+    }
+}
+
+impl Drop for EventBus {
+    fn drop(&mut self) {
+        self.running.store(false, Ordering::Relaxed);
+        self.handles.drain(..).for_each(|h| {
+            debug!("joining thread {:?}", h.thread().name());
+            h.join().unwrap()
+        });
     }
 }

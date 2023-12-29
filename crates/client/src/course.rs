@@ -1,7 +1,5 @@
 use serde::Deserialize;
 
-use crate::{content::Content, Client, Result};
-
 #[derive(Debug, Deserialize)]
 pub struct Course {
     pub id: String,

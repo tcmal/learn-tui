@@ -1,36 +1,37 @@
 use anyhow::Result;
 use bblearn_api::content::ContentPayload;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use ratatui::{prelude::Rect, widgets::Paragraph, Frame};
 
-use crate::store::{ContentIdx, Store};
+use crate::{
+    event::Event,
+    store::{ContentIdx, Store},
+};
 
-use super::{Action, Page};
+use super::{Action, Pane};
 
+#[derive(Default)]
 pub enum Document {
+    #[default]
     Blank,
     Content(ContentIdx),
 }
 
-impl Default for Document {
-    fn default() -> Self {
-        Document::Blank
-    }
-}
+
 
 #[derive(Default)]
-pub struct ViewerPage {
+pub struct Viewer {
     show: Document,
     cached_render: Option<Paragraph<'static>>,
 }
-impl ViewerPage {
+impl Viewer {
     pub fn show(&mut self, d: Document) {
         self.show = d;
         self.cached_render = None;
     }
 }
 
-impl Page for ViewerPage {
+impl Pane for Viewer {
     fn draw(&mut self, store: &Store, frame: &mut Frame, area: Rect) {
         let rendered = self
             .cached_render
@@ -46,17 +47,22 @@ impl Page for ViewerPage {
         frame.render_widget(rendered, area)
     }
 
-    fn handle_key(&mut self, _: &Store, key: KeyEvent) -> Result<Action> {
+    fn handle_event(&mut self, _: &Store, event: Event) -> Result<Action> {
+        let Event::Key(key) = event else {
+            return Ok(Action::None);
+        };
+
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => return Ok(Action::FocusNavigation),
             _ => (),
             // TODO
-        }
+        };
+
         Ok(Action::None)
     }
 }
 
-impl ViewerPage {
+impl Viewer {
     fn render_content(&mut self, store: &Store, content_idx: ContentIdx) -> Paragraph<'static> {
         let content = store.content(content_idx);
         match &content.payload {

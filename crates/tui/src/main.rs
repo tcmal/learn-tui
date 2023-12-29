@@ -1,51 +1,63 @@
 use anyhow::Result;
 use app::App;
-use event::{Event, EventLoop};
-use log::debug;
+use event::EventBus;
+use log::{debug, error};
 use ratatui::prelude::*;
 use simplelog::{LevelFilter, WriteLogger};
-use std::{fs::File, io};
-use tui::Tui;
+use std::{env, fs::File, io};
 
 mod app;
-mod config;
+mod auth_cache;
 mod event;
-mod screens;
+mod panes;
 mod store;
 mod tui;
-mod widgets;
 
 fn main() -> Result<()> {
-    WriteLogger::init(
-        LevelFilter::Debug,
-        simplelog::Config::default(),
-        File::create(".learn-tui.log").unwrap(),
-    )
-    .unwrap();
+    init_logging();
 
-    let backend = CrosstermBackend::new(io::stderr());
-    let terminal = Terminal::new(backend)?;
+    // Initialise app and event bus
+    let mut bus = EventBus::new();
+    let mut app = App::new(&mut bus)?;
+    bus.spawn_terminal_listener();
 
-    let events = EventLoop::new();
-    let mut app = App::new(&events)?;
+    // Initialise terminal
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stderr()))?;
+    tui::init(&mut terminal)?;
 
-    let mut tui = Tui::new(terminal, events);
-
-    tui.init()?;
-
-    while app.running {
-        tui.draw(&mut app)?;
-        let next = tui.events.next()?;
-        debug!("received event {:?}", next);
-        match next {
-            Event::Key(key_event) => app.handle_key(key_event)?,
-            Event::Mouse(_) => {}
-            Event::Resize(_, _) => {}
-            Event::Store(e) => app.store.event(e),
-        }
+    if let Err(e) = main_loop(&mut app, &mut bus, &mut terminal) {
+        error!("error in main loop: {}", e);
     }
 
-    app.clean_shutdown();
+    // Cleanup
+    debug!("exiting");
+    tui::exit(&mut terminal)?;
+    Ok(())
+}
+
+fn main_loop<B: Backend>(
+    app: &mut App,
+    bus: &mut EventBus,
+    terminal: &mut Terminal<B>,
+) -> Result<()> {
+    while app.running {
+        tui::draw(terminal, app)?;
+        let next = bus.next()?;
+        debug!("received event {:?}", next);
+        app.handle_event(next)?;
+    }
 
     Ok(())
+}
+
+fn init_logging() {
+    // Log if environment variable set
+    if env::var("LEARN_TUI_LOG").is_ok() {
+        WriteLogger::init(
+            LevelFilter::Debug,
+            simplelog::Config::default(),
+            File::create(".learn-tui.log").unwrap(),
+        )
+        .unwrap();
+    }
 }
