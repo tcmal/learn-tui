@@ -17,8 +17,6 @@ pub enum Document {
     Content(ContentIdx),
 }
 
-
-
 #[derive(Default)]
 pub struct Viewer {
     show: Document,

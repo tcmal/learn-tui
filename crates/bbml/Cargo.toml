@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ratatui = "0.25.0"
 tl = "0.7.7"
+ratatui = { workspace = true }
 log = { workspace = true }
 
 [dev-dependencies]

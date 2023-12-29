@@ -10,6 +10,7 @@ members = [
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
 log = "0.4.20"
+ratatui = { version = "0.25.0", features = ["unstable-rendered-line-info"] }
 
 [patch.crates-io]
 ureq = { path = "../ureq" }

@@ -82,7 +82,7 @@ impl Client {
             .into_string()?;
 
         let samlreq_re = Regex::new(r#"name="SAMLRequest" value="([^"]*)""#).unwrap();
-        let Some(caps ) = samlreq_re.captures(&text) else {
+        let Some(caps) = samlreq_re.captures(&text) else {
             return Err(Error::NoSAMLRequest(text));
         };
         let samlreq = &caps[1];
@@ -95,7 +95,7 @@ impl Client {
             .map_err(Error::IDPReqError)?
             .into_string()?;
         let samlresp_re = Regex::new(r#"name="SAMLResponse" value="([^"]*)""#).unwrap();
-        let Some(caps ) = samlresp_re.captures(&text) else {
+        let Some(caps) = samlresp_re.captures(&text) else {
             return Err(Error::NoSAMLResponse(text));
         };
         let samlresp = &caps[1];

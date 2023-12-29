@@ -6,15 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.76"
+ratatui = { workspace = true }
+crossterm = "0.27.0"
+tui-tree-widget = "0.16.0"
+xdg = "2.5.2"
 bblearn_api = { path = "../client" }
 bbml = { path = "../bbml" }
-crossterm = "0.27.0"
-ratatui = { version = "0.25.0", features = ["unstable-rendered-line-info"] }
-xdg = "2.5.2"
-
+anyhow = "1.0.76"
 log = { workspace = true }
+simplelog = "0.12.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
-tui-tree-widget = "0.16.0"
-simplelog = "0.12.1"
