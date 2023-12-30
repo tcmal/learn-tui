@@ -12,6 +12,9 @@ pub struct AuthCache {
     auth_state: AuthState,
 }
 
+const PREFIX: &str = "learn-tui";
+const FILE_NAME: &str = "auth_cache.json";
+
 impl AuthCache {
     pub fn from_client(client: &Client) -> Self {
         Self {
@@ -25,8 +28,8 @@ impl AuthCache {
     }
 
     pub fn load() -> Result<Self> {
-        let path = BaseDirectories::with_prefix("learn-tui")?
-            .find_cache_file("auth_cache.json")
+        let path = BaseDirectories::with_prefix(PREFIX)?
+            .find_config_file(FILE_NAME)
             .ok_or_else(|| anyhow!("auth cache does not exist"))?;
 
         let file = File::open(path).context("error opening auth cache")?;
@@ -36,9 +39,7 @@ impl AuthCache {
     }
 
     pub fn save(&self) -> Result<()> {
-        let path =
-            BaseDirectories::with_prefix("learn-tui")?.place_cache_file("auth_cache.json")?;
-
+        let path = BaseDirectories::with_prefix(PREFIX)?.place_config_file(FILE_NAME)?;
         let mut file = File::create(path).context("error opening auth cache")?;
 
         serde_json::to_writer(&mut file, &self).context("error deserialising auth cache")?;
