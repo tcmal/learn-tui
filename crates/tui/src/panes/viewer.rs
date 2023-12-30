@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bblearn_api::content::ContentPayload;
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{prelude::Rect, widgets::Paragraph, Frame};
 
 use crate::{
@@ -20,11 +20,14 @@ pub enum Document {
 #[derive(Default)]
 pub struct Viewer {
     show: Document,
+    y_offset: u16,
+    jump_y_offset: u16,
     cached_render: Option<Paragraph<'static>>,
 }
 impl Viewer {
     pub fn show(&mut self, d: Document) {
         self.show = d;
+        self.y_offset = 0;
         self.cached_render = None;
     }
 }
@@ -42,7 +45,12 @@ impl Pane for Viewer {
                 Document::Content(idx) => self.render_content(store, idx),
             });
 
-        frame.render_widget(rendered, area)
+        self.jump_y_offset = area.height / 2;
+
+        let max_y_offset = (rendered.line_count(area.width) as u16).saturating_sub(area.height);
+        self.y_offset = self.y_offset.min(max_y_offset);
+
+        frame.render_widget(rendered.scroll((self.y_offset, 0)), area)
     }
 
     fn handle_event(&mut self, _: &Store, event: Event) -> Result<Action> {
@@ -52,8 +60,24 @@ impl Pane for Viewer {
 
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => return Ok(Action::FocusNavigation),
+
+            KeyCode::Char('g') => self.y_offset = 0,
+            KeyCode::Char('G') => self.y_offset = u16::MAX,
+
+            KeyCode::Char('j') => self.y_offset += 1,
+            KeyCode::Char('k') => self.y_offset = self.y_offset.saturating_sub(1),
+
+            KeyCode::Char('u') | KeyCode::Char('U')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                self.y_offset = self.y_offset.saturating_sub(self.jump_y_offset)
+            }
+            KeyCode::Char('d') | KeyCode::Char('D')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                self.y_offset += self.jump_y_offset
+            }
             _ => (),
-            // TODO
         };
 
         Ok(Action::None)
