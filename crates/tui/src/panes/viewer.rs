@@ -1,7 +1,11 @@
 use anyhow::Result;
 use bblearn_api::content::ContentPayload;
 use crossterm::event::{KeyCode, KeyModifiers};
-use ratatui::{prelude::Rect, widgets::Paragraph, Frame};
+use ratatui::{
+    prelude::{Margin, Rect},
+    widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    Frame,
+};
 
 use crate::{
     event::Event,
@@ -45,12 +49,27 @@ impl Pane for Viewer {
                 Document::Content(idx) => self.render_content(store, idx),
             });
 
+        let line_count = rendered.line_count(area.width);
         self.jump_y_offset = area.height / 2;
 
-        let max_y_offset = (rendered.line_count(area.width) as u16).saturating_sub(area.height);
+        let max_y_offset = (line_count as u16).saturating_sub(area.height as u16);
         self.y_offset = self.y_offset.min(max_y_offset);
 
-        frame.render_widget(rendered.scroll((self.y_offset, 0)), area)
+        let scrollbar = Scrollbar::default()
+            .orientation(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(Some("↑"))
+            .end_symbol(Some("↓"));
+        let mut scrollbar_state =
+            ScrollbarState::new(max_y_offset as usize).position(self.y_offset as usize);
+
+        frame.render_widget(
+            rendered.scroll((self.y_offset, 0)),
+            area.inner(&Margin {
+                vertical: 0,
+                horizontal: 1,
+            }),
+        );
+        frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
     }
 
     fn handle_event(&mut self, _: &Store, event: Event) -> Result<Action> {
