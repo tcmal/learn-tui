@@ -1,6 +1,6 @@
 use anyhow::Result;
+use bblearn_api::Credentials;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use log::debug;
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Rect},
     widgets::{Block, Borders},
@@ -8,9 +8,11 @@ use ratatui::{
 };
 
 use crate::{
+    auth_cache::LoginDetails,
     event::{Event, EventBus},
     panes::{Document, Navigation, Pane, Viewer},
     store::Store,
+    Screen,
 };
 
 pub enum Action {
@@ -31,9 +33,9 @@ pub struct App {
 
 impl App {
     /// Create a new app using the given event bus
-    pub fn new(events: &mut EventBus) -> Result<Self> {
+    pub fn new(events: &mut EventBus, login_details: LoginDetails) -> Result<Self> {
         Ok(Self {
-            store: Store::new(events)?,
+            store: Store::new(events, login_details)?,
             navigation: Navigation::default(),
             viewer: Viewer::default(),
             running: true,
@@ -41,9 +43,15 @@ impl App {
         })
     }
 
+    /// Quit the application
+    pub fn quit(&mut self) {
+        self.running = false;
+    }
+}
+
+impl Screen for App {
     /// Draw to the given frame
-    pub fn draw(&mut self, frame: &mut Frame) {
-        debug!("drawing");
+    fn draw(&mut self, frame: &mut Frame) {
         let size = frame.size();
 
         // Add margin for borders
@@ -65,9 +73,7 @@ impl App {
         )
         .split(content_rect);
 
-        debug!("drawing navigation");
         self.navigation.draw(&self.store, frame, layout[0]);
-        debug!("drawing viewer");
         self.viewer.draw(&self.store, frame, layout[2]);
 
         // Draw a focus rectangle around one of them.
@@ -91,7 +97,7 @@ impl App {
     }
 
     /// Handle the given event
-    pub fn handle_event(&mut self, event: Event) -> Result<()> {
+    fn handle_event(&mut self, event: Event) -> Result<()> {
         // C-C always exits
         if matches!(
             event,
@@ -131,8 +137,7 @@ impl App {
         Ok(())
     }
 
-    /// Quit the application
-    pub fn quit(&mut self) {
-        self.running = false;
+    fn running(&self) -> bool {
+        self.running
     }
 }

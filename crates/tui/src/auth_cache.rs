@@ -8,7 +8,7 @@ use xdg::BaseDirectories;
 /// Caches credentials and authentication state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthCache {
-    creds: Credentials,
+    pub creds: Credentials,
     auth_state: AuthState,
 }
 
@@ -46,4 +46,10 @@ impl AuthCache {
 
         Ok(())
     }
+}
+
+#[derive(Debug)]
+pub struct LoginDetails {
+    pub creds: Credentials,
+    pub remember: bool,
 }

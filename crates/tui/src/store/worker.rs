@@ -1,14 +1,11 @@
 use anyhow::Result;
 use bblearn_api::Client;
 use log::debug;
-use std::{
-    env,
-    sync::mpsc::{channel, Receiver, Sender},
-};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 use super::{Event, LoadRequest};
 use crate::{
-    auth_cache::AuthCache,
+    auth_cache::{AuthCache, LoginDetails},
     event::{Event as CrateEvent, EventBus},
 };
 
@@ -17,21 +14,21 @@ pub struct StoreWorker {
     client: Client,
     msg_recv: Receiver<LoadRequest>,
     event_send: Sender<CrateEvent>,
+    save_auth: bool,
 }
 
 impl StoreWorker {
     /// Spawn the store worker on the given event bus, returning a channel to send commands down.
-    pub fn spawn_on(bus: &mut EventBus) -> Result<Sender<LoadRequest>> {
+    pub fn spawn_on(
+        bus: &mut EventBus,
+        login_details: LoginDetails,
+    ) -> Result<Sender<LoadRequest>> {
         let client = match AuthCache::load() {
             Ok(c) => c.into_client().unwrap(),
             Err(e) => {
                 println!("error loading config: {:?}", e);
 
-                let creds = (
-                    env::var("LEARN_USERNAME").unwrap(),
-                    env::var("LEARN_PASSWORD").unwrap().into(),
-                );
-                Client::new(creds)
+                Client::new(login_details.creds)
             }
         };
         let (cmd_send, cmd_recv) = channel();
@@ -42,6 +39,7 @@ impl StoreWorker {
                 client,
                 msg_recv: cmd_recv,
                 event_send,
+                save_auth: login_details.remember,
             }
             .main()
         });
@@ -62,10 +60,12 @@ impl StoreWorker {
         }
 
         debug!("shutting down");
-        debug!(
-            "saving config: {:?}",
-            AuthCache::from_client(&self.client).save()
-        );
+        if self.save_auth {
+            debug!(
+                "saving config: {:?}",
+                AuthCache::from_client(&self.client).save()
+            );
+        }
     }
 
     fn process_msg(&self, msg: LoadRequest) -> Result<Event> {

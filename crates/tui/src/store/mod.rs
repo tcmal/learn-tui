@@ -3,13 +3,14 @@ use bblearn_api::{
     content::{Content, ContentPayload},
     course::Course,
     users::User,
+    Credentials,
 };
 use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 
 mod worker;
 pub use worker::StoreWorker;
 
-use crate::event::EventBus;
+use crate::{auth_cache::LoginDetails, event::EventBus};
 
 pub type CourseIdx = usize;
 pub type ContentIdx = usize;
@@ -67,8 +68,8 @@ pub enum Event {
 }
 
 impl Store {
-    pub fn new(bus: &mut EventBus) -> Result<Self> {
-        let worker_channel = StoreWorker::spawn_on(bus)?;
+    pub fn new(bus: &mut EventBus, login_details: LoginDetails) -> Result<Self> {
+        let worker_channel = StoreWorker::spawn_on(bus, login_details)?;
 
         Ok(Self {
             worker_channel,
