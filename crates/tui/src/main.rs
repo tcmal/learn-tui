@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use event::{Event, EventBus};
 use log::{debug, error};
 use ratatui::prelude::*;
@@ -26,6 +26,20 @@ fn main() -> Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stderr()))?;
     tui::init(&mut terminal)?;
 
+    let res = run_in_terminal(&mut terminal);
+
+    // Cleanup
+    debug!("exiting");
+    tui::exit(&mut terminal)?;
+
+    if let Err(e) = res {
+        println!("{}", e);
+    }
+
+    Ok(())
+}
+
+fn run_in_terminal<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     let mut bus = EventBus::new();
     bus.spawn_terminal_listener();
 
@@ -35,20 +49,13 @@ fn main() -> Result<()> {
             creds: a.creds,
             remember: true,
         },
-        Err(_) => prompt_auth(&mut bus, &mut terminal)?,
+        Err(_) => prompt_auth(&mut bus, terminal)?,
     };
 
     // Initialise app and event bus
     let mut app = App::new(&mut bus, login_details)?;
 
-    if let Err(e) = main_loop(&mut app, &mut bus, &mut terminal) {
-        error!("error in main loop: {}", e);
-    }
-
-    // Cleanup
-    debug!("exiting");
-    tui::exit(&mut terminal)?;
-    Ok(())
+    main_loop(&mut app, &mut bus, terminal)
 }
 
 fn prompt_auth<B: Backend>(bus: &mut EventBus, terminal: &mut Terminal<B>) -> Result<LoginDetails> {
@@ -59,7 +66,7 @@ fn prompt_auth<B: Backend>(bus: &mut EventBus, terminal: &mut Terminal<B>) -> Re
         error!("error in main loop: {}", e);
     }
 
-    todo!()
+    app.extract_details().ok_or_else(|| anyhow!("exited"))
 }
 
 pub trait Screen {
