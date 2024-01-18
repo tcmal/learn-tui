@@ -72,8 +72,11 @@ impl StoreWorker {
                     .user_memberships(&me.id)?
                     .into_iter()
                     .map(|m| m.course)
-                    .collect();
-                Ok(Event::Me(me, courses))
+                    .collect::<Vec<_>>();
+
+                let terms = self.client.terms()?;
+
+                Ok(Event::Me(me, courses, terms))
             }
             LoadRequest::CourseContent {
                 course_idx,

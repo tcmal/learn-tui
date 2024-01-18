@@ -83,6 +83,7 @@ impl Pane for Navigation {
                         ..
                     } => (),
                     NavTree::Loading => (),
+                    NavTree::Header { .. } => (),
                 }
             }
             _ => (),
@@ -105,14 +106,21 @@ impl Navigation {
         let mut changed = false;
         let loading = self.nav_tree.len() == 1 && self.nav_tree[0] == NavTree::Loading;
         if loading {
-            if let Some(courses) = store.my_courses() {
+            if let Some(all_courses) = store.courses_by_term() {
                 // done loading
-                self.nav_tree = (0..courses.len())
-                    .map(|course_idx| NavTree::Node {
-                        ty: NodeTy::Course(course_idx),
-                        children: NavTreeChildren::NotRequested,
-                    })
-                    .collect();
+                self.nav_tree.clear();
+                for (term_idx, (_, courses)) in all_courses.iter().enumerate() {
+                    self.nav_tree.push(NavTree::Header {
+                        ty: HeaderTy::Term(term_idx),
+                    });
+                    for course_idx in courses {
+                        self.nav_tree.push(NavTree::Node {
+                            ty: NodeTy::Course(*course_idx),
+                            children: NavTreeChildren::NotRequested,
+                        });
+                    }
+                }
+
                 self.tree_state.select(vec![TreeId::Course(0)]);
                 changed = true;
             } else {
@@ -123,19 +131,18 @@ impl Navigation {
 
         // loaded/partially loaded tree
         for item in self.nav_tree.iter_mut() {
-            let NavTree::Node {
+            if let NavTree::Node {
                 ty: NodeTy::Course(course_idx),
                 ..
             } = &item
-            else {
-                panic!("top level in tree is not course node");
-            };
-            changed |= Self::refresh_subtree(
-                &mut self.tree_state,
-                store,
-                &mut vec![TreeId::Course(*course_idx)],
-                item,
-            );
+            {
+                changed |= Self::refresh_subtree(
+                    &mut self.tree_state,
+                    store,
+                    &mut vec![TreeId::Course(*course_idx)],
+                    item,
+                );
+            }
         }
 
         changed
@@ -155,6 +162,7 @@ impl Navigation {
             } => false,
             NavTree::ContentLeaf { .. } => false,
             NavTree::Loading => false,
+            NavTree::Header { .. } => false,
 
             // recursively refresh loaded subtrees
             NavTree::Node {

@@ -1,6 +1,10 @@
+use ratatui::{
+    style::{Color, Modifier, Style},
+    text::Text,
+};
 use tui_tree_widget::TreeItem;
 
-use crate::store::{ContentIdx, CourseIdx, Store};
+use crate::store::{ContentIdx, CourseIdx, Store, TermIdx};
 
 /// Our navigation tree, but with only IDs, loading information, etc.
 /// This is a sort of 'abstract' tree that gets compiled into a [`TreeItem`] which is then rendered.
@@ -16,6 +20,9 @@ pub enum NavTree {
 
     /// A placeholder to show that the whole tree is loading.
     Loading,
+
+    /// A header, which can't be selected and is just decorative
+    Header { ty: HeaderTy },
 }
 
 /// The type of a node - either course or content.
@@ -23,6 +30,31 @@ pub enum NavTree {
 pub enum NodeTy {
     Course(CourseIdx),
     Content(ContentIdx),
+}
+
+/// The type of a header, mostly to uniquely identify it
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HeaderTy {
+    Term(TermIdx),
+}
+impl HeaderTy {
+    fn treeitem(&self, store: &Store) -> TreeItem<'static, TreeId> {
+        match self {
+            HeaderTy::Term(idx) => TreeItem::new_leaf(
+                self.id(),
+                Text::styled(
+                    store.courses_by_term().unwrap()[*idx].0.clone(),
+                    Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                ),
+            ),
+        }
+    }
+
+    fn id(&self) -> TreeId {
+        match self {
+            HeaderTy::Term(i) => TreeId::TermHeader(*i),
+        }
+    }
 }
 
 /// The state of the children of a node
@@ -41,6 +73,7 @@ pub enum NavTreeChildren {
 /// Identifies a specific item in the tree. Used for selection, etc.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TreeId {
+    TermHeader(TermIdx),
     Course(CourseIdx),
     CourseLoading(CourseIdx),
     Content(CourseIdx),
@@ -54,6 +87,12 @@ impl NavTree {
         if ids.is_empty() {
             panic!("attempt to get navtree with invalid id");
         }
+
+        // special case for loading
+        if matches!(ids[0], TreeId::Loading) {
+            return &mut leafs[0];
+        }
+
         let next = leafs
             .iter_mut()
             .find(|x| x.matches(ids[0]))
@@ -80,6 +119,12 @@ impl NavTree {
             | (NavTree::ContentLeaf { content_idx }, TreeId::ContentLoading(idx)) => {
                 *content_idx == idx
             }
+            (
+                NavTree::Header {
+                    ty: HeaderTy::Term(term_idx),
+                },
+                TreeId::TermHeader(idx),
+            ) => *term_idx == idx,
             _ => false,
         }
     }
@@ -112,6 +157,8 @@ impl NavTree {
                 store,
                 children.iter().map(|nt| nt.as_treeitem(store)).collect(),
             ),
+
+            NavTree::Header { ty } => ty.treeitem(store),
         }
     }
 
@@ -120,6 +167,7 @@ impl NavTree {
             NavTree::Node { ty, .. } => ty.id(),
             NavTree::ContentLeaf { content_idx } => TreeId::Content(*content_idx),
             NavTree::Loading => TreeId::Loading,
+            NavTree::Header { ty } => ty.id(),
         }
     }
 }

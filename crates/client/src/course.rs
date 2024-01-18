@@ -1,6 +1,7 @@
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Course {
     pub id: String,
     pub uuid: String,
@@ -10,4 +11,5 @@ pub struct Course {
     pub description: Option<String>,
     #[serde(rename = "termId")]
     pub term_id: Option<String>,
+    pub created: Option<DateTime<Utc>>,
 }

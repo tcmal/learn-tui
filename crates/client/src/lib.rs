@@ -2,6 +2,7 @@ mod auth;
 pub mod content;
 pub mod course;
 pub mod membership;
+pub mod terms;
 pub mod users;
 
 pub use auth::{AuthState, Credentials, Error as AuthError, Password};

@@ -14,3 +14,4 @@ ureq = { version = "2.9.1", features = ["json", "cookies"] }
 log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+chrono = { version = "0.4.31", features = ["serde"] }

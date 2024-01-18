@@ -2,6 +2,7 @@ use anyhow::Result;
 use bblearn_api::{
     content::{Content, ContentPayload},
     course::Course,
+    terms::Term,
     users::User,
 };
 use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
@@ -11,13 +12,16 @@ pub use worker::StoreWorker;
 
 use crate::{auth_cache::LoginDetails, event::EventBus, main_screen::Action};
 
+pub type TermIdx = usize;
 pub type CourseIdx = usize;
 pub type ContentIdx = usize;
 
 /// Global data store
 pub struct Store {
-    me: Option<(User, Vec<Course>)>,
+    me: Option<User>,
 
+    courses_by_term: Vec<(String, Vec<CourseIdx>)>,
+    courses: Vec<Course>,
     contents: Vec<Content>,
     content_children: HashMap<ContentIdx, Range<ContentIdx>>,
     course_contents: HashMap<CourseIdx, Range<ContentIdx>>,
@@ -51,7 +55,7 @@ pub enum LoadRequest {
 #[derive(Debug)]
 pub enum Event {
     Error(bblearn_api::Error),
-    Me(User, Vec<Course>),
+    Me(User, Vec<Course>, Vec<Term>),
     CourseContent {
         course_idx: CourseIdx,
         content: Vec<Content>,
@@ -73,6 +77,8 @@ impl Store {
         Ok(Self {
             worker_channel,
             me: Default::default(),
+            courses_by_term: Default::default(),
+            courses: Default::default(),
             course_contents: Default::default(),
             content_children: Default::default(),
             contents: Default::default(),
@@ -81,7 +87,15 @@ impl Store {
     }
 
     pub fn my_courses(&self) -> Option<&[Course]> {
-        self.me.as_ref().map(|(_, courses)| courses.as_slice())
+        self.me.as_ref()?;
+
+        Some(&self.courses)
+    }
+
+    pub fn courses_by_term(&self) -> Option<&[(String, Vec<CourseIdx>)]> {
+        self.me.as_ref()?;
+
+        Some(&self.courses_by_term)
     }
 
     pub fn request_my_courses(&self) {
@@ -158,7 +172,25 @@ impl Store {
         match e {
             Event::Error(bblearn_api::Error::AuthError(_)) => return Some(Action::Reauthenticate),
             Event::Error(e) => panic!("{}", e), // TODO
-            Event::Me(u, cs) => self.me = Some((u, cs)),
+            Event::Me(u, cs, mut terms) => {
+                self.me = Some(u);
+
+                terms.reverse();
+                for term in terms {
+                    let term_courses = cs
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, c)| c.term_id.as_ref().map(|i| *i == term.id).unwrap_or(false))
+                        .map(|(i, _)| i)
+                        .collect::<Vec<_>>();
+
+                    if !term_courses.is_empty() {
+                        self.courses_by_term.push((term.name, term_courses));
+                    }
+                }
+
+                self.courses = cs;
+            }
             Event::CourseContent {
                 course_idx,
                 content,
