@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use event::{Event, EventBus};
-use log::{debug, error};
+use log::debug;
 use ratatui::prelude::*;
 use simplelog::{LevelFilter, WriteLogger};
-use std::{env, fs::File, io};
+use std::{env, fs::File, io, rc::Rc};
 use viewer::App;
 
 use crate::{
@@ -22,7 +22,7 @@ mod viewer;
 fn main() -> Result<()> {
     init_logging();
 
-    // Initialise terminal and event bus
+    // Initialise terminal
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stderr()))?;
     tui::init(&mut terminal)?;
 
@@ -40,51 +40,57 @@ fn main() -> Result<()> {
 }
 
 fn run_in_terminal<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
-    let mut bus = EventBus::new();
+    let bus = Rc::new(EventBus::new());
     bus.spawn_terminal_listener();
 
-    // Login screen if needed
-    let login_details = match AuthCache::load() {
-        Ok(a) => LoginDetails {
-            creds: a.creds,
-            remember: true,
-        },
-        Err(_) => prompt_auth(&mut bus, terminal)?,
+    // Login screen if needed, or just the app
+    let app: Box<dyn Screen> = match AuthCache::load() {
+        Ok(a) => Box::new(App::new(
+            bus.clone(),
+            LoginDetails {
+                creds: a.creds,
+                remember: true,
+            },
+        )?),
+        Err(_) => Box::new(LoginPrompt::new(bus.clone())),
     };
 
-    // Initialise app and event bus
-    let mut app = App::new(&mut bus, login_details)?;
-
-    main_loop(&mut app, &mut bus, terminal)
-}
-
-fn prompt_auth<B: Backend>(bus: &mut EventBus, terminal: &mut Terminal<B>) -> Result<LoginDetails> {
-    // Initialise app and event bus
-    let mut app = LoginPrompt::default();
-
-    if let Err(e) = main_loop(&mut app, bus, terminal) {
-        error!("error in main loop: {}", e);
-    }
-
-    app.extract_details().ok_or_else(|| anyhow!("exited"))
+    // Start everything
+    main_loop(app, bus, terminal)
 }
 
 pub trait Screen {
     fn draw(&mut self, frame: &mut Frame);
-    fn handle_event(&mut self, event: Event) -> Result<()>;
-    fn running(&self) -> bool;
+    fn handle_event(&mut self, event: Event) -> Result<ExitState>;
 }
 
-fn main_loop<A: Screen, B: Backend>(
-    app: &mut A,
-    bus: &mut EventBus,
+pub enum ExitState {
+    Running,
+    Quit,
+    ChangeScreen(Box<dyn Screen>),
+}
+
+fn main_loop<B: Backend>(
+    mut app: Box<dyn Screen>,
+    bus: Rc<EventBus>,
     terminal: &mut Terminal<B>,
 ) -> Result<()> {
-    while app.running() {
-        tui::draw(terminal, app)?;
-        let next = bus.next()?;
-        debug!("received event {:?}", next);
-        app.handle_event(next)?;
+    loop {
+        let mut exit_state = ExitState::Running;
+        while matches!(exit_state, ExitState::Running) {
+            tui::draw(terminal, app.as_mut())?;
+
+            let next = bus.next()?;
+            debug!("received event {:?}", next);
+
+            exit_state = app.handle_event(next)?;
+        }
+
+        match exit_state {
+            ExitState::Quit => break,
+            ExitState::ChangeScreen(s) => app = s,
+            ExitState::Running => unreachable!(),
+        }
     }
 
     Ok(())

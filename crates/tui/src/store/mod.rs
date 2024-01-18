@@ -3,14 +3,13 @@ use bblearn_api::{
     content::{Content, ContentPayload},
     course::Course,
     users::User,
-    Credentials,
 };
 use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 
 mod worker;
 pub use worker::StoreWorker;
 
-use crate::{auth_cache::LoginDetails, event::EventBus};
+use crate::{auth_cache::LoginDetails, event::EventBus, viewer::Action};
 
 pub type CourseIdx = usize;
 pub type ContentIdx = usize;
@@ -51,7 +50,7 @@ pub enum LoadRequest {
 /// Messages received by the app from the worker thread
 #[derive(Debug)]
 pub enum Event {
-    Error(anyhow::Error),
+    Error(bblearn_api::Error),
     Me(User, Vec<Course>),
     CourseContent {
         course_idx: CourseIdx,
@@ -68,7 +67,7 @@ pub enum Event {
 }
 
 impl Store {
-    pub fn new(bus: &mut EventBus, login_details: LoginDetails) -> Result<Self> {
+    pub fn new(bus: &EventBus, login_details: LoginDetails) -> Result<Self> {
         let worker_channel = StoreWorker::spawn_on(bus, login_details)?;
 
         Ok(Self {
@@ -155,8 +154,9 @@ impl Store {
         &self.my_courses().unwrap()[course_idx]
     }
 
-    pub fn event(&mut self, e: Event) {
+    pub fn event(&mut self, e: Event) -> Option<Action> {
         match e {
+            Event::Error(bblearn_api::Error::AuthError(_)) => return Some(Action::Reauthenticate),
             Event::Error(e) => panic!("{}", e), // TODO
             Event::Me(u, cs) => self.me = Some((u, cs)),
             Event::CourseContent {
@@ -182,6 +182,8 @@ impl Store {
             Event::PageText { content_idx, text } => {
                 self.page_texts.insert(content_idx, text);
             }
-        }
+        };
+
+        None
     }
 }

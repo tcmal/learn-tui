@@ -1,4 +1,3 @@
-use crate::viewer::App;
 use crate::Screen;
 use anyhow::Result;
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
@@ -27,7 +26,7 @@ pub fn init<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     Ok(())
 }
 
-pub fn draw<A: Screen, B: Backend>(terminal: &mut Terminal<B>, app: &mut A) -> Result<()> {
+pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &mut dyn Screen) -> Result<()> {
     terminal.draw(|frame| app.draw(frame))?;
 
     Ok(())

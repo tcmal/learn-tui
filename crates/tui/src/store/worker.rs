@@ -19,14 +19,11 @@ pub struct StoreWorker {
 
 impl StoreWorker {
     /// Spawn the store worker on the given event bus, returning a channel to send commands down.
-    pub fn spawn_on(
-        bus: &mut EventBus,
-        login_details: LoginDetails,
-    ) -> Result<Sender<LoadRequest>> {
+    pub fn spawn_on(bus: &EventBus, login_details: LoginDetails) -> Result<Sender<LoadRequest>> {
         let client = match AuthCache::load() {
             Ok(c) => c.into_client().unwrap(),
             Err(e) => {
-                println!("error loading config: {:?}", e);
+                debug!("error loading config: {:?}", e);
 
                 Client::new(login_details.creds)
             }
@@ -61,14 +58,12 @@ impl StoreWorker {
 
         debug!("shutting down");
         if self.save_auth {
-            debug!(
-                "saving config: {:?}",
-                AuthCache::from_client(&self.client).save()
-            );
+            let res = AuthCache::from_client(&self.client).save();
+            debug!("saving config: {:?}", res);
         }
     }
 
-    fn process_msg(&self, msg: LoadRequest) -> Result<Event> {
+    fn process_msg(&self, msg: LoadRequest) -> Result<Event, bblearn_api::Error> {
         match msg {
             LoadRequest::Me => {
                 let me = self.client.me()?;

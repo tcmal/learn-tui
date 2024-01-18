@@ -1,6 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
 use log::debug;
+use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::Arc;
@@ -33,7 +34,7 @@ pub struct EventBus {
     sender: mpsc::Sender<Event>,
     receiver: mpsc::Receiver<Event>,
     running: Arc<AtomicBool>,
-    handles: Vec<thread::JoinHandle<()>>,
+    handles: RefCell<Vec<thread::JoinHandle<()>>>,
 }
 
 impl EventBus {
@@ -44,7 +45,7 @@ impl EventBus {
             sender,
             receiver,
             running: Arc::new(AtomicBool::new(true)),
-            handles: vec![],
+            handles: Default::default(),
         }
     }
 
@@ -57,13 +58,13 @@ impl EventBus {
     }
 
     /// Spawn a new thread that can publish to this event bus
-    pub fn spawn<F>(&mut self, name: impl ToString, f: F)
+    pub fn spawn<F>(&self, name: impl ToString, f: F)
     where
         F: 'static + Send + FnOnce(Arc<AtomicBool>, Sender<Event>),
     {
         let sender = self.sender.clone();
         let running = self.running.clone();
-        self.handles.push(
+        self.handles.borrow_mut().push(
             thread::Builder::new()
                 .name(name.to_string())
                 .spawn(move || f(running, sender))
@@ -72,7 +73,7 @@ impl EventBus {
     }
 
     /// Spawn a thread to publish terminal events to this bus
-    pub fn spawn_terminal_listener(&mut self) {
+    pub fn spawn_terminal_listener(&self) {
         self.spawn("terminal_events", Self::terminal_events)
     }
 
@@ -98,7 +99,7 @@ impl EventBus {
 impl Drop for EventBus {
     fn drop(&mut self) {
         self.running.store(false, Ordering::Relaxed);
-        self.handles.drain(..).for_each(|h| {
+        self.handles.borrow_mut().drain(..).for_each(|h| {
             debug!("joining thread {:?}", h.thread().name());
             h.join().unwrap()
         });

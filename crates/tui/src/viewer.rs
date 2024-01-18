@@ -1,5 +1,6 @@
+use std::rc::Rc;
+
 use anyhow::Result;
-use bblearn_api::Credentials;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Rect},
@@ -10,9 +11,10 @@ use ratatui::{
 use crate::{
     auth_cache::LoginDetails,
     event::{Event, EventBus},
+    login_prompt::LoginPrompt,
     panes::{Document, Navigation, Pane, Viewer},
     store::Store,
-    Screen,
+    ExitState, Screen,
 };
 
 pub enum Action {
@@ -20,6 +22,7 @@ pub enum Action {
     None,
     Show(Document),
     FocusNavigation,
+    Reauthenticate,
 }
 
 /// Holds application-related state
@@ -29,13 +32,15 @@ pub struct App {
     navigation: Navigation,
     viewer: Viewer,
     viewer_focused: bool,
+    events: Rc<EventBus>,
 }
 
 impl App {
     /// Create a new app using the given event bus
-    pub fn new(events: &mut EventBus, login_details: LoginDetails) -> Result<Self> {
+    pub fn new(events: Rc<EventBus>, login_details: LoginDetails) -> Result<Self> {
         Ok(Self {
-            store: Store::new(events, login_details)?,
+            store: Store::new(&events, login_details)?,
+            events,
             navigation: Navigation::default(),
             viewer: Viewer::default(),
             running: true,
@@ -97,7 +102,7 @@ impl Screen for App {
     }
 
     /// Handle the given event
-    fn handle_event(&mut self, event: Event) -> Result<()> {
+    fn handle_event(&mut self, event: Event) -> Result<ExitState> {
         // C-C always exits
         if matches!(
             event,
@@ -107,21 +112,19 @@ impl Screen for App {
                 ..
             })
         ) {
-            self.quit();
-            return Ok(());
+            return Ok(ExitState::Quit);
         }
 
-        // Dispatch store events to the store
-        if let Event::Store(s) = event {
-            self.store.event(s);
-            return Ok(());
-        }
-
-        // and everything else to whichever pane is focused
-        let action = match self.viewer_focused {
-            true => self.viewer.handle_event(&self.store, event),
-            false => self.navigation.handle_event(&self.store, event),
-        }?;
+        let action = if let Event::Store(s) = event {
+            // Dispatch store events to the store
+            self.store.event(s).unwrap_or(Action::None)
+        } else {
+            // and everything else to whichever pane is focused
+            match self.viewer_focused {
+                true => self.viewer.handle_event(&self.store, event),
+                false => self.navigation.handle_event(&self.store, event),
+            }?
+        };
 
         // Perform action if needed
         match action {
@@ -132,12 +135,16 @@ impl Screen for App {
                 self.viewer_focused = true;
             }
             Action::FocusNavigation => self.viewer_focused = false,
+            Action::Reauthenticate => {
+                return Ok(ExitState::ChangeScreen(Box::new(
+                    LoginPrompt::new_with_msg(
+                        self.events.clone(),
+                        "Authentication failed, please double check your username & password.",
+                    ),
+                )));
+            }
         };
 
-        Ok(())
-    }
-
-    fn running(&self) -> bool {
-        self.running
+        Ok(ExitState::Running)
     }
 }

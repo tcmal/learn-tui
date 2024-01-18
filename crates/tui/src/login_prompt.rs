@@ -1,29 +1,47 @@
-use crate::{auth_cache::LoginDetails, event::Event, Screen};
+use std::rc::Rc;
+
+use crate::{
+    auth_cache::LoginDetails,
+    event::{Event, EventBus},
+    viewer::App,
+    ExitState, Screen,
+};
+use anyhow::Result;
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
-#[derive(Default)]
 pub struct LoginPrompt {
     username: String,
     password: String,
     remember: bool,
     selected: SelectedInput,
-    run_state: RunState,
     message: &'static str,
+    events: Rc<EventBus>,
 }
 
 impl LoginPrompt {
-    pub fn extract_details(self) -> Option<LoginDetails> {
-        if self.run_state == RunState::Submit {
-            Some(LoginDetails {
-                creds: (self.username, self.password.into()),
-                remember: self.remember,
-            })
-        } else {
-            None
+    pub fn new(events: Rc<EventBus>) -> Self {
+        Self {
+            events,
+            username: String::new(),
+            password: String::new(),
+            remember: false,
+            selected: SelectedInput::Username,
+            message: "",
+        }
+    }
+
+    pub fn new_with_msg(events: Rc<EventBus>, message: &'static str) -> Self {
+        Self {
+            events,
+            username: String::new(),
+            password: String::new(),
+            remember: false,
+            selected: SelectedInput::Username,
+            message,
         }
     }
 }
@@ -62,7 +80,9 @@ impl Screen for LoginPrompt {
             .block(Block::new().borders(Borders::BOTTOM))
             .alignment(Alignment::Center);
 
-        let message_para = Paragraph::new(self.message.clone()).alignment(Alignment::Center);
+        let message_para = Paragraph::new(self.message.clone())
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: false });
 
         frame.render_widget(header_para, layout[0]);
         frame.render_widget(username_para, layout[2]);
@@ -70,13 +90,12 @@ impl Screen for LoginPrompt {
         frame.render_widget(remember_para, layout[4]);
         frame.render_widget(message_para, layout[6]);
     }
-
-    fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
+    fn handle_event(&mut self, event: Event) -> Result<ExitState> {
         match event {
             Event::Key(k) => match k.code {
-                KeyCode::Esc => self.run_state = RunState::Quit,
+                KeyCode::Esc => return Ok(ExitState::Quit),
                 KeyCode::Char('c') | KeyCode::Char('C') if k.modifiers == KeyModifiers::CONTROL => {
-                    self.run_state = RunState::Quit;
+                    return Ok(ExitState::Quit);
                 }
 
                 KeyCode::Tab | KeyCode::Down => self.selected.down(),
@@ -104,7 +123,13 @@ impl Screen for LoginPrompt {
                     } else if self.password.is_empty() {
                         self.message = "Password is empty!";
                     } else {
-                        self.run_state = RunState::Submit;
+                        return Ok(ExitState::ChangeScreen(Box::new(App::new(
+                            self.events.clone(),
+                            LoginDetails {
+                                creds: (self.username.clone(), self.password.clone().into()),
+                                remember: self.remember,
+                            },
+                        )?)));
                     }
                 }
 
@@ -113,11 +138,7 @@ impl Screen for LoginPrompt {
             _ => (),
         };
 
-        Ok(())
-    }
-
-    fn running(&self) -> bool {
-        self.run_state == RunState::Running
+        Ok(ExitState::Running)
     }
 }
 
@@ -150,24 +171,5 @@ impl SelectedInput {
         } else {
             Borders::NONE
         }
-    }
-}
-
-#[derive(PartialEq, Eq)]
-enum RunState {
-    Running,
-    Quit,
-    Submit,
-}
-
-impl Default for SelectedInput {
-    fn default() -> Self {
-        Self::Username
-    }
-}
-
-impl Default for RunState {
-    fn default() -> Self {
-        RunState::Running
     }
 }
