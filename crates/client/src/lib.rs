@@ -1,4 +1,3 @@
-#![allow(clippy::result_large_err)]
 mod auth;
 pub mod content;
 pub mod course;
@@ -28,7 +27,7 @@ pub enum Error {
     AuthError(#[from] AuthError),
 
     #[error("http error: {}", .0)]
-    HTTPError(#[from] ureq::Error),
+    HTTPError(#[from] Box<ureq::Error>),
 
     #[error("io error: {}", .0)]
     IOError(#[from] std::io::Error),
@@ -67,17 +66,24 @@ impl Client {
         F: FnMut() -> Result<T, Error>,
     {
         match f() {
-            Err(Error::HTTPError(ureq::Error::Status(c, _))) if c / 100 == 4 => {
-                self.authenticate()?;
-                f()
-            }
+            Err(Error::HTTPError(e)) => match e.as_ref() {
+                ureq::Error::Status(c, _) if c / 100 == 4 => {
+                    self.authenticate()?;
+                    f()
+                }
+                _ => Err(Error::HTTPError(e)),
+            },
             x => x,
         }
     }
 
     pub(crate) fn get<T: for<'a> Deserialize<'a>>(&self, url: &str) -> Result<T, Error> {
         self.with_reattempt_auth(|| {
-            let resp = self.http.get(&format!("{}{}", LEARN_BASE, url)).call()?;
+            let resp = self
+                .http
+                .get(&format!("{}{}", LEARN_BASE, url))
+                .call()
+                .map_err(Box::new)?;
             if log::log_enabled!(log::Level::Debug) {
                 let s = resp.into_string()?;
                 debug!("response: {}", s);
@@ -94,7 +100,8 @@ impl Client {
             Ok(self
                 .http
                 .get(&format!("{}institution/api/health", LEARN_BASE))
-                .call()?
+                .call()
+                .map_err(Box::new)?
                 .into_json()?)
         })
     }

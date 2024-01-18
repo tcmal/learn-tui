@@ -57,7 +57,7 @@ impl<'a> RenderState<'a> {
             Node::Tag(t) => {
                 let tag_name = &*t.name().as_utf8_str();
                 let c = t.children();
-                let children = c.top();
+                let _children = c.top();
                 match tag_name {
                     "br" => newline(text),
                     // "h4" | "h5" | "h6" => {
@@ -141,10 +141,10 @@ impl<'a> RenderState<'a> {
             }
             Node::Raw(s) => {
                 let s = s.as_utf8_str();
-                if !s.contains("\n") {
+                if !s.contains('\n') {
                     append(text, s.to_string().into());
                 } else {
-                    for l in s.split("\n") {
+                    for l in s.split('\n') {
                         append(text, l.to_string().into());
                         newline(text);
                     }

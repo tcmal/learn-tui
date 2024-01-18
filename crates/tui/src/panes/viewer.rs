@@ -52,7 +52,7 @@ impl Pane for Viewer {
         let line_count = rendered.line_count(area.width);
         self.jump_y_offset = area.height / 2;
 
-        let max_y_offset = (line_count as u16).saturating_sub(area.height as u16);
+        let max_y_offset = (line_count as u16).saturating_sub(area.height);
         self.y_offset = self.y_offset.min(max_y_offset);
 
         let scrollbar = Scrollbar::default()

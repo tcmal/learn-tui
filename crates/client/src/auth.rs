@@ -23,13 +23,13 @@ pub enum Error {
     NoSAMLResponse(String),
 
     #[error("error communicating with learn: {}", .0)]
-    LearnReqError(ureq::Error),
+    LearnReqError(Box<ureq::Error>),
 
     #[error("error communicating with EASE: {}", .0)]
-    EaseReqError(ureq::Error),
+    EaseReqError(Box<ureq::Error>),
 
     #[error("error communicating with idp: {}", .0)]
-    IDPReqError(ureq::Error),
+    IDPReqError(Box<ureq::Error>),
 
     #[error("misc I/O error: {}", .0)]
     IOError(#[from] std::io::Error),
@@ -48,7 +48,7 @@ impl Client {
         self.http
             .get("https://www.ease.ed.ac.uk/")
             .call()
-            .map_err(Error::EaseReqError)?;
+            .map_err(|e| Error::EaseReqError(Box::new(e)))?;
 
         // Login to CoSign
         let text = self
@@ -58,7 +58,7 @@ impl Client {
                 ("login", &self.creds.0),
                 ("password", self.creds.1.as_ref()),
             ])
-            .map_err(Error::EaseReqError)?
+            .map_err(|e| Error::EaseReqError(Box::new(e)))?
             .into_string()?;
 
         if !text.contains("/logout/logout.cgi") {
@@ -78,7 +78,7 @@ impl Client {
             .http
             .get(LEARN_LOGIN_URL)
             .call()
-            .map_err(Error::LearnReqError)?
+            .map_err(|e| Error::LearnReqError(Box::new(e)))?
             .into_string()?;
 
         let samlreq_re = Regex::new(r#"name="SAMLRequest" value="([^"]*)""#).unwrap();
@@ -92,7 +92,7 @@ impl Client {
             .http
             .post(SSO_SAML_URL)
             .send_form(&[("SAMLRequest", samlreq)])
-            .map_err(Error::IDPReqError)?
+            .map_err(|e| Error::IDPReqError(Box::new(e)))?
             .into_string()?;
         let samlresp_re = Regex::new(r#"name="SAMLResponse" value="([^"]*)""#).unwrap();
         let Some(caps) = samlresp_re.captures(&text) else {
@@ -103,7 +103,7 @@ impl Client {
         self.http
             .post(LEARN_CALLBACK_URL)
             .send_form(&[("SAMLResponse", samlresp)])
-            .map_err(Error::LearnReqError)?;
+            .map_err(|e| Error::LearnReqError(Box::new(e)))?;
 
         Ok(())
     }

@@ -140,11 +140,11 @@ struct RawContent {
 
 #[derive(Debug, Deserialize)]
 struct Link {
-    title: String,
+    // title: String,
     href: String,
-    #[serde(rename = "type")]
-    type_: String,
-    rel: String,
+    // #[serde(rename = "type")]
+    // type_: String,
+    // rel: String,
 }
 
 #[derive(Debug, Deserialize)]

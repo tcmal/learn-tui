@@ -91,8 +91,8 @@ impl Screen for LoginPrompt {
         frame.render_widget(message_para, layout[6]);
     }
     fn handle_event(&mut self, event: Event) -> Result<ExitState> {
-        match event {
-            Event::Key(k) => match k.code {
+        if let Event::Key(k) = event {
+            match k.code {
                 KeyCode::Esc => return Ok(ExitState::Quit),
                 KeyCode::Char('c') | KeyCode::Char('C') if k.modifiers == KeyModifiers::CONTROL => {
                     return Ok(ExitState::Quit);
@@ -134,8 +134,7 @@ impl Screen for LoginPrompt {
                 }
 
                 _ => (),
-            },
-            _ => (),
+            };
         };
 
         Ok(ExitState::Running)
