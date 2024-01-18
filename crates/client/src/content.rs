@@ -86,6 +86,14 @@ impl Content {
     pub fn is_container(&self) -> bool {
         matches!(self.payload, ContentPayload::Folder)
     }
+
+    pub fn browser_link(&self) -> Option<&str> {
+        if let ContentPayload::Link(link) = &self.payload {
+            Some(link)
+        } else {
+            self.link.as_deref()
+        }
+    }
 }
 
 /// What the content is, and the actual content if it carries it.

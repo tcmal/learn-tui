@@ -54,6 +54,7 @@ impl Pane for Navigation {
             KeyCode::Enter | KeyCode::Tab => {
                 let sel = self.tree_state.selected();
                 let sel_node = NavTree::navigate_mut(&mut self.nav_tree, &sel);
+
                 match sel_node {
                     // toggle visibility
                     NavTree::Node {
@@ -75,6 +76,11 @@ impl Pane for Navigation {
                     // show in viewer
                     NavTree::ContentLeaf { content_idx } => {
                         return Ok(Action::Show(Document::Content(*content_idx)));
+                    }
+                    NavTree::Header {
+                        ty: HeaderTy::Welcome,
+                    } => {
+                        return Ok(Action::Show(Document::Welcome));
                     }
 
                     // do nothing on loading stuff
@@ -109,6 +115,9 @@ impl Navigation {
             if let Some(all_courses) = store.courses_by_term() {
                 // done loading
                 self.nav_tree.clear();
+                self.nav_tree.push(NavTree::Header {
+                    ty: HeaderTy::Welcome,
+                });
                 for (term_idx, (_, courses)) in all_courses.iter().enumerate() {
                     self.nav_tree.push(NavTree::Header {
                         ty: HeaderTy::Term(term_idx),
@@ -121,7 +130,7 @@ impl Navigation {
                     }
                 }
 
-                self.tree_state.select(vec![TreeId::Course(0)]);
+                self.tree_state.select(vec![TreeId::Welcome]);
                 changed = true;
             } else {
                 // still loading

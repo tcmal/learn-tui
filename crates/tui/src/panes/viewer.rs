@@ -3,7 +3,9 @@ use bblearn_api::content::ContentPayload;
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
     prelude::{Margin, Rect},
-    widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    style::{Color, Modifier, Style, Stylize},
+    text::{Line, Text},
+    widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
     Frame,
 };
 
@@ -17,7 +19,7 @@ use super::{Action, Pane};
 #[derive(Default)]
 pub enum Document {
     #[default]
-    Blank,
+    Welcome,
     Content(ContentIdx),
 }
 
@@ -38,16 +40,40 @@ impl Viewer {
 
 impl Pane for Viewer {
     fn draw(&mut self, store: &Store, frame: &mut Frame, area: Rect) {
-        let rendered = self
-            .cached_render
-            .clone()
-            .unwrap_or_else(|| match self.show {
-                Document::Blank => {
-                    self.cached_render = Some(Paragraph::new(""));
-                    self.cached_render.clone().unwrap()
-                }
+        let rendered = self.cached_render.clone().unwrap_or_else(|| {
+            self.cached_render = Some(match self.show {
                 Document::Content(idx) => self.render_content(store, idx),
+                Document::Welcome => Paragraph::new(Into::<Text>::into(vec![
+                    vec!["Welcome to learn-tui!\n".blue().bold()].into(),
+                    vec![
+                        "Use ".into(),
+                        "j/k or ↓/↑".blue(),
+                        " to navigate up and down, then ".into(),
+                        "Enter".blue(),
+                        " to select an item.\n".into(),
+                    ]
+                    .into(),
+                    vec![
+                        "When an item is selected, you can scroll the viewer pane using ".into(),
+                        "j/k ↓/↑ g/G PgUp/PgDn".blue(),
+                        " and go back to the navigation pane with ".into(),
+                        "q".blue(),
+                        ".".into(),
+                    ]
+                    .into(),
+                    vec![
+                        "At any point, use ".into(),
+                        "b".blue(),
+                        " to try to open the selected item in your browser.\n".into(),
+                    ]
+                    .into(),
+                    vec!["Use ".into(), "Ctrl-C".blue(), " to quit.".into()].into(),
+                ]))
+                .wrap(Wrap { trim: false }),
             });
+
+            self.cached_render.clone().unwrap()
+        });
 
         let line_count = rendered.line_count(area.width);
         self.jump_y_offset = area.height / 2;
@@ -98,19 +124,13 @@ impl Pane for Viewer {
             }
 
             KeyCode::Char('b') => match self.show {
-                Document::Blank => (),
                 Document::Content(content_idx) => {
                     let content = store.content(content_idx);
-                    let link = if let ContentPayload::Link(link) = &content.payload {
-                        Some(link)
-                    } else {
-                        content.link.as_ref()
-                    };
-
-                    if let Some(link) = link {
+                    if let Some(link) = content.browser_link() {
                         open::that(link)?;
                     }
                 }
+                _ => (),
             },
             _ => (),
         };
@@ -133,9 +153,15 @@ impl Viewer {
                     Paragraph::new("Loading...")
                 }
             },
-            ContentPayload::Link(l) => Paragraph::new(format!("Link to {}", l)),
+            ContentPayload::Link(l) => Paragraph::new(format!("Link to {}. Open with b", l)),
             ContentPayload::Folder => Paragraph::new("Folder"),
-            ContentPayload::Other(o) => Paragraph::new(format!("Unrecognised content type: {}", o)),
+            ContentPayload::Other(o) => Paragraph::new(vec![
+                Line::styled(
+                    format!("Unknown content type: '{}'", o),
+                    Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+                Line::raw("Complain to Aria, and in the meantime open in your browser with b."),
+            ]),
         }
     }
 }

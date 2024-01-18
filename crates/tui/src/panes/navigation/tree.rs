@@ -35,24 +35,29 @@ pub enum NodeTy {
 /// The type of a header, mostly to uniquely identify it
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HeaderTy {
+    Welcome,
     Term(TermIdx),
 }
 impl HeaderTy {
     fn treeitem(&self, store: &Store) -> TreeItem<'static, TreeId> {
-        match self {
-            HeaderTy::Term(idx) => TreeItem::new_leaf(
-                self.id(),
-                Text::styled(
-                    store.courses_by_term().unwrap()[*idx].0.clone(),
-                    Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-                ),
+        let title = match self {
+            HeaderTy::Term(idx) => store.courses_by_term().unwrap()[*idx].0.clone(),
+            HeaderTy::Welcome => "Welcome".to_string(),
+        };
+
+        TreeItem::new_leaf(
+            self.id(),
+            Text::styled(
+                title,
+                Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             ),
-        }
+        )
     }
 
     fn id(&self) -> TreeId {
         match self {
             HeaderTy::Term(i) => TreeId::TermHeader(*i),
+            HeaderTy::Welcome => TreeId::Welcome,
         }
     }
 }
@@ -79,6 +84,7 @@ pub enum TreeId {
     Content(CourseIdx),
     ContentLoading(CourseIdx),
     Loading,
+    Welcome,
 }
 
 impl NavTree {
@@ -125,6 +131,12 @@ impl NavTree {
                 },
                 TreeId::TermHeader(idx),
             ) => *term_idx == idx,
+            (
+                NavTree::Header {
+                    ty: HeaderTy::Welcome,
+                },
+                TreeId::Welcome,
+            ) => true,
             _ => false,
         }
     }
