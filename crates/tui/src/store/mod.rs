@@ -9,7 +9,7 @@ use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 mod worker;
 pub use worker::StoreWorker;
 
-use crate::{auth_cache::LoginDetails, event::EventBus, viewer::Action};
+use crate::{auth_cache::LoginDetails, event::EventBus, main_screen::Action};
 
 pub type CourseIdx = usize;
 pub type ContentIdx = usize;

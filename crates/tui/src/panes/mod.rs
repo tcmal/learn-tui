@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ratatui::{prelude::Rect, Frame};
 
-use crate::{event::Event, store::Store, viewer::Action};
+use crate::{event::Event, main_screen::Action, store::Store};
 
 mod navigation;
 mod viewer;

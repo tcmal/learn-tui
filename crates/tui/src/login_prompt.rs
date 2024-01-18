@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::{
     auth_cache::LoginDetails,
     event::{Event, EventBus},
-    viewer::App,
+    main_screen::MainScreen,
     ExitState, Screen,
 };
 use anyhow::Result;
@@ -123,7 +123,7 @@ impl Screen for LoginPrompt {
                     } else if self.password.is_empty() {
                         self.message = "Password is empty!";
                     } else {
-                        return Ok(ExitState::ChangeScreen(Box::new(App::new(
+                        return Ok(ExitState::ChangeScreen(Box::new(MainScreen::new(
                             self.events.clone(),
                             LoginDetails {
                                 creds: (self.username.clone(), self.password.clone().into()),

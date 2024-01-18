@@ -26,7 +26,7 @@ pub enum Action {
 }
 
 /// Holds application-related state
-pub struct App {
+pub struct MainScreen {
     pub running: bool,
     store: Store,
     navigation: Navigation,
@@ -35,7 +35,7 @@ pub struct App {
     events: Rc<EventBus>,
 }
 
-impl App {
+impl MainScreen {
     /// Create a new app using the given event bus
     pub fn new(events: Rc<EventBus>, login_details: LoginDetails) -> Result<Self> {
         Ok(Self {
@@ -54,7 +54,7 @@ impl App {
     }
 }
 
-impl Screen for App {
+impl Screen for MainScreen {
     /// Draw to the given frame
     fn draw(&mut self, frame: &mut Frame) {
         let size = frame.size();

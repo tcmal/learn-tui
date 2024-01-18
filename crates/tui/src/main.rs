@@ -1,10 +1,10 @@
 use anyhow::Result;
 use event::{Event, EventBus};
 use log::debug;
+use main_screen::MainScreen;
 use ratatui::prelude::*;
 use simplelog::{LevelFilter, WriteLogger};
 use std::{env, fs::File, io, rc::Rc};
-use viewer::App;
 
 use crate::{
     auth_cache::{AuthCache, LoginDetails},
@@ -14,10 +14,10 @@ use crate::{
 mod auth_cache;
 mod event;
 mod login_prompt;
+mod main_screen;
 mod panes;
 mod store;
 mod tui;
-mod viewer;
 
 fn main() -> Result<()> {
     init_logging();
@@ -45,7 +45,7 @@ fn run_in_terminal<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
 
     // Login screen if needed, or just the app
     let app: Box<dyn Screen> = match AuthCache::load() {
-        Ok(a) => Box::new(App::new(
+        Ok(a) => Box::new(MainScreen::new(
             bus.clone(),
             LoginDetails {
                 creds: a.creds,
