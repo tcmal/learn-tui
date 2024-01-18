@@ -92,6 +92,21 @@ impl Pane for Navigation {
                     NavTree::Header { .. } => (),
                 }
             }
+            KeyCode::Char('b') => {
+                let sel = self.tree_state.selected();
+                let sel_node = NavTree::navigate_mut(&mut self.nav_tree, &sel);
+                if let NavTree::ContentLeaf { content_idx }
+                | NavTree::Node {
+                    ty: NodeTy::Content(content_idx),
+                    ..
+                } = sel_node
+                {
+                    let content = store.content(*content_idx);
+                    if let Some(link) = content.browser_link() {
+                        open::that(link)?;
+                    }
+                }
+            }
             _ => (),
         };
 
