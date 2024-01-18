@@ -72,7 +72,7 @@ impl Pane for Viewer {
         frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
     }
 
-    fn handle_event(&mut self, _: &Store, event: Event) -> Result<Action> {
+    fn handle_event(&mut self, store: &Store, event: Event) -> Result<Action> {
         let Event::Key(key) = event else {
             return Ok(Action::None);
         };
@@ -96,6 +96,22 @@ impl Pane for Viewer {
             {
                 self.y_offset += self.jump_y_offset
             }
+
+            KeyCode::Char('b') => match self.show {
+                Document::Blank => (),
+                Document::Content(content_idx) => {
+                    let content = store.content(content_idx);
+                    let link = if let ContentPayload::Link(link) = &content.payload {
+                        Some(link)
+                    } else {
+                        content.link.as_ref()
+                    };
+
+                    if let Some(link) = link {
+                        open::that(link)?;
+                    }
+                }
+            },
             _ => (),
         };
 

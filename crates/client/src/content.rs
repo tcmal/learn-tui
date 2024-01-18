@@ -4,7 +4,7 @@ use serde::{
 };
 use std::fmt;
 
-use crate::{Client, Error, Result};
+use crate::{Client, Error, Result, LEARN_BASE};
 
 impl Client {
     pub fn content_children(&self, course_id: &str, content_id: &str) -> Result<Vec<Content>> {
@@ -54,7 +54,7 @@ pub struct Content {
 }
 
 impl Content {
-    fn new(raw: RawContent, course_id: &str) -> Self {
+    fn new(mut raw: RawContent, course_id: &str) -> Self {
         let payload = match raw
             .content_detail
             .filter(|d| !matches!(d, ContentDetail::Unknown))
@@ -75,7 +75,10 @@ impl Content {
             course_id: course_id.to_string(),
             title: raw.title,
             description: raw.description,
-            link: raw.body.and_then(|b| b.web_location), // TODO: sometimes there's a link attribute you can get this out of if theres no body, need to investigate more
+            link: raw.body.and_then(|b| b.web_location).or(raw
+                .links
+                .pop()
+                .map(|l| format!("{}{}", LEARN_BASE, &l.href[1..]))),
             payload,
         }
     }
@@ -131,6 +134,17 @@ struct RawContent {
     // sometimes this just contains the data that would be in content_detail in a different format! fun!
     #[serde(rename = "contentHandler", deserialize_with = "handler_to_detail")]
     content_handler: Option<ContentDetail>,
+
+    links: Vec<Link>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Link {
+    title: String,
+    href: String,
+    #[serde(rename = "type")]
+    type_: String,
+    rel: String,
 }
 
 #[derive(Debug, Deserialize)]
