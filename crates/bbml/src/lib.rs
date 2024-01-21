@@ -1,5 +1,5 @@
 use ratatui::{
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Paragraph, Wrap},
 };
@@ -25,7 +25,13 @@ fn cleanup(text: &mut Text) {
     text.lines
         .iter_mut()
         .for_each(|l| l.spans.retain(|s| !s.content.is_empty()));
-    // text.lines.retain(|l| !l.spans.is_empty());
+    if !text.lines.is_empty() && text.lines[0].spans.is_empty() {
+        text.lines.remove(0);
+    }
+
+    if !text.lines.is_empty() && text.lines.last().unwrap().spans.is_empty() {
+        text.lines.remove(text.lines.len() - 1);
+    }
 }
 
 struct RenderState<'a> {
@@ -57,76 +63,58 @@ impl<'a> RenderState<'a> {
             Node::Tag(t) => {
                 let tag_name = &*t.name().as_utf8_str();
                 let c = t.children();
-                let _children = c.top();
+                let children = c.top();
                 match tag_name {
                     "br" => newline(text),
-                    // "h4" | "h5" | "h6" => {
-                    //     let new_style = match tag_name {
-                    //         "h4" => curr_style
-                    //             .underline_color(Color::White)
-                    //             .add_modifier(Modifier::BOLD),
-                    //         "h5" | "h6" => curr_style.add_modifier(Modifier::BOLD),
-                    //         _ => unreachable!(),
-                    //     };
-                    //     join_results(
-                    //         children
-                    //             .iter()
-                    //             .map(|child| self.render_internal(child, new_style))
-                    //             .chain(once(RenderResult::Line(Line {
-                    //                 spans: vec![],
-                    //                 alignment: None,
-                    //             }))),
-                    //     )
-                    // }
-                    // "div" | "p" | "span" | "strong" | "a" | "li" => {
-                    //     let new_style = if tag_name == "a" {
-                    //         curr_style.fg(Color::Blue)
-                    //     } else {
-                    //         curr_style
-                    //     };
+                    "h4" | "h5" | "h6" => {
+                        let new_style = match tag_name {
+                            "h4" => curr_style
+                                .underline_color(Color::White)
+                                .add_modifier(Modifier::BOLD),
+                            "h5" | "h6" => curr_style.add_modifier(Modifier::BOLD),
+                            _ => unreachable!(),
+                        };
+                        for child in children.iter() {
+                            self.render_internal(text, child, new_style);
+                        }
+                        newline(text);
+                    }
+                    "span" | "strong" | "a" | "li" => {
+                        let new_style = match tag_name {
+                            "a" => curr_style.fg(Color::Blue),
+                            "strong" => curr_style.add_modifier(Modifier::BOLD),
+                            _ => curr_style,
+                        };
 
-                    //     join_results(
-                    //         children
-                    //             .iter()
-                    //             .map(|child| self.render_internal(child, new_style)),
-                    //     )
-                    // }
-                    // "ul" | "ol" => {
-                    //     let mut next_item: Box<dyn FnMut() -> String> = match tag_name {
-                    //         "ul" => Box::new(|| "  - ".to_string()),
-                    //         "ol" => {
-                    //             let mut i = 0;
-                    //             Box::new(move || {
-                    //                 i += 1;
-                    //                 format!("{}. ", i)
-                    //             })
-                    //         }
-                    //         _ => unreachable!(),
-                    //     };
-                    //     join_results(
-                    //         children
-                    //             .iter()
-                    //             .map(|child| self.render_internal(child, curr_style))
-                    //             .map(|child| match child {
-                    //                 RenderResult::Text(mut t) => {
-                    //                     if !t.lines.is_empty() {
-                    //                         t.lines[0].spans.insert(0, Span::raw(next_item()));
-                    //                         for i in 1..t.lines.len() {
-                    //                             t.lines[i].spans.insert(0, Span::raw("    "));
-                    //                         }
-                    //                     }
-                    //                     RenderResult::Text(t)
-                    //                 }
-                    //                 RenderResult::Line(mut l) => {
-                    //                     l.spans.insert(0, Span::raw(next_item()));
-                    //                     RenderResult::Line(l)
-                    //                 }
-                    //                 RenderResult::Span(s) => {
-                    //                     RenderResult::Line(vec![Span::raw(next_item()), s].into())
-                    //                 }
-                    //             }),
-                    //     )
-                    // }
+                        for child in children.iter() {
+                            self.render_internal(text, child, new_style);
+                        }
+                    }
+                    "ul" | "ol" => {
+                        let mut next_item: Box<dyn FnMut() -> String> = match tag_name {
+                            "ul" => Box::new(|| "  - ".to_string()),
+                            "ol" => {
+                                let mut i = 0;
+                                Box::new(move || {
+                                    i += 1;
+                                    format!("{}. ", i)
+                                })
+                            }
+                            _ => unreachable!(),
+                        };
+                        for child in children.iter() {
+                            let mut subtext = Text::raw("");
+                            self.render_internal(&mut subtext, child, curr_style);
+                            if !subtext.lines.is_empty() {
+                                subtext.lines[0].spans.insert(0, Span::raw(next_item()));
+                                for i in 1..subtext.lines.len() {
+                                    subtext.lines[i].spans.insert(0, Span::raw("    "));
+                                }
+                            }
+
+                            text.lines.extend(subtext.lines);
+                        }
+                    }
                     s => {
                         log::error!("unknown tag: {}", s);
                         t.children().top().iter().for_each(|child| {
@@ -142,10 +130,10 @@ impl<'a> RenderState<'a> {
             Node::Raw(s) => {
                 let s = s.as_utf8_str();
                 if !s.contains('\n') {
-                    append(text, s.to_string().into());
+                    append(text, Span::styled(s.to_string(), curr_style));
                 } else {
                     for l in s.split('\n') {
-                        append(text, l.to_string().into());
+                        append(text, Span::styled(l.to_string(), curr_style));
                         newline(text);
                     }
                 }
