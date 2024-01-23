@@ -102,9 +102,7 @@ impl Pane for Navigation {
                 } = sel_node
                 {
                     let content = store.content(*content_idx);
-                    if let Some(link) = content.browser_link() {
-                        open::that(link)?;
-                    }
+                    open::that(content.browser_link())?;
                 }
             }
             _ => (),

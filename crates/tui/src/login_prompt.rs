@@ -80,7 +80,7 @@ impl Screen for LoginPrompt {
             .block(Block::new().borders(Borders::BOTTOM))
             .alignment(Alignment::Center);
 
-        let message_para = Paragraph::new(self.message.clone())
+        let message_para = Paragraph::new(self.message)
             .alignment(Alignment::Center)
             .wrap(Wrap { trim: false });
 

@@ -48,13 +48,14 @@ pub struct Content {
 
     pub title: String,
     pub description: Option<String>,
-    pub link: Option<String>,
 
     pub payload: ContentPayload,
+
+    link: String,
 }
 
 impl Content {
-    fn new(mut raw: RawContent, course_id: &str) -> Self {
+    fn new(raw: RawContent, course_id: &str) -> Self {
         let payload = match raw.content_detail {
             Some(ContentDetail::ExternalLink { url }) => ContentPayload::Link(url),
             Some(ContentDetail::Folder { is_page: true }) => ContentPayload::Page,
@@ -74,18 +75,21 @@ impl Content {
                 permanent_url: format!(
                     "{}{}",
                     LEARN_BASE,
-                    permanent_url.strip_prefix("/").unwrap()
+                    permanent_url.strip_prefix('/').unwrap()
                 ),
             },
             Some(ContentDetail::Unknown {}) | None => ContentPayload::Other,
         };
 
         Content {
+            link: format!(
+                "{}ultra/redirect?redirectType=nautilus&courseId={}&contentId={}&parentId={}",
+                LEARN_BASE, course_id, raw.id, raw.parent_id
+            ),
             id: raw.id,
             course_id: course_id.to_string(),
             title: raw.title,
             description: raw.description,
-            link: raw.body.and_then(|b| b.web_location),
             payload,
         }
     }
@@ -94,11 +98,11 @@ impl Content {
         matches!(self.payload, ContentPayload::Folder)
     }
 
-    pub fn browser_link(&self) -> Option<&str> {
+    pub fn browser_link(&self) -> &str {
         match &self.payload {
-            ContentPayload::Link(link) => Some(link),
-            ContentPayload::File { permanent_url, .. } => Some(permanent_url),
-            _ => self.link.as_deref(),
+            ContentPayload::Link(link) => link,
+            ContentPayload::File { permanent_url, .. } => permanent_url,
+            _ => &self.link,
         }
     }
 }
@@ -142,8 +146,10 @@ pub struct ContentChildrenResp {
 //   - for links, we get ContentDetail::ExternalLink
 //   - for other stuff, we get different content details, etc.
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RawContent {
     id: String,
+    parent_id: String,
 
     title: String,
     description: Option<String>,
@@ -151,25 +157,13 @@ struct RawContent {
     // sometimes this is just a string for raw_text!
     #[serde(deserialize_with = "raw_body_str_or_struct", default = "none")]
     body: Option<RawContentBody>,
-    #[serde(rename = "contentDetail")]
     content_detail: Option<ContentDetail>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Link {
-    // title: String,
-    href: String,
-    // #[serde(rename = "type")]
-    // type_: String,
-    // rel: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct RawContentBody {
     #[serde(rename = "rawText")]
     raw_text: String,
-    #[serde(rename = "webLocation")]
-    web_location: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -220,7 +214,6 @@ where
         {
             Ok(RawContentBody {
                 raw_text: v.to_string(),
-                web_location: None,
             })
         }
 

@@ -135,15 +135,12 @@ impl Pane for Viewer {
                 self.y_offset += self.jump_y_offset
             }
 
-            KeyCode::Char('b') => match self.show {
-                Document::Content(content_idx) => {
+            KeyCode::Char('b') => {
+                if let Document::Content(content_idx) = self.show {
                     let content = store.content(content_idx);
-                    if let Some(link) = content.browser_link() {
-                        open::that(link)?;
-                    }
-                }
-                _ => (),
-            },
+                    open::that(content.browser_link())?;
+                };
+            }
             _ => (),
         };
 
@@ -185,7 +182,7 @@ impl Viewer {
             ])),
             ContentPayload::Other => Some(Paragraph::new(vec![
                 Line::styled(
-                    format!("Unknown content type."),
+                    "Unknown content type.",
                     Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
                 ),
                 Line::raw("File an issue, and in the meantime open in your browser with b."),
