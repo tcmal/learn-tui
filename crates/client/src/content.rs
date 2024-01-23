@@ -77,9 +77,7 @@ impl Content {
                     permanent_url.strip_prefix("/").unwrap()
                 ),
             },
-            Some(ContentDetail::Unknown {}) | None => {
-                ContentPayload::Other("x/bb-api-is-shit".to_string())
-            }
+            Some(ContentDetail::Unknown {}) | None => ContentPayload::Other,
         };
 
         Content {
@@ -117,8 +115,8 @@ pub enum ContentPayload {
     /// A page. Use [`Self::page_contents`] to get the actual text.
     Page,
 
-    /// Something else. The contained string is the content handler, which might be a hint.
-    Other(String),
+    /// Something else.
+    Other,
 
     /// A file, may meant to be downloaded or embedded.
     File {

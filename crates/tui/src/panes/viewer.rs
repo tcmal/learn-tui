@@ -183,9 +183,9 @@ impl Viewer {
                 Line::raw(mime_type.clone()),
                 Line::raw("Open with b"),
             ])),
-            ContentPayload::Other(o) => Some(Paragraph::new(vec![
+            ContentPayload::Other => Some(Paragraph::new(vec![
                 Line::styled(
-                    format!("Unknown content type: '{}'", o),
+                    format!("Unknown content type."),
                     Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
                 ),
                 Line::raw("File an issue, and in the meantime open in your browser with b."),
