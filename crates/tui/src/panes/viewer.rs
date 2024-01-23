@@ -171,6 +171,18 @@ impl Viewer {
             },
             ContentPayload::Link(l) => Some(Paragraph::new(format!("Link to {}. Open with b", l))),
             ContentPayload::Folder => Some(Paragraph::new("Folder")),
+            ContentPayload::File {
+                file_name,
+                mime_type,
+                ..
+            } => Some(Paragraph::new(vec![
+                Line::styled(
+                    file_name.clone(),
+                    Style::new().fg(Color::Blue).add_modifier(Modifier::BOLD),
+                ),
+                Line::raw(mime_type.clone()),
+                Line::raw("Open with b"),
+            ])),
             ContentPayload::Other(o) => Some(Paragraph::new(vec![
                 Line::styled(
                     format!("Unknown content type: '{}'", o),

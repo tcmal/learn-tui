@@ -61,6 +61,22 @@ impl Content {
             Some(ContentDetail::Folder { is_page: false }) | Some(ContentDetail::Lesson {}) => {
                 ContentPayload::Folder
             }
+            Some(ContentDetail::File {
+                file:
+                    RawFile {
+                        mime_type,
+                        permanent_url,
+                        file_name,
+                    },
+            }) => ContentPayload::File {
+                file_name,
+                mime_type,
+                permanent_url: format!(
+                    "{}{}",
+                    LEARN_BASE,
+                    permanent_url.strip_prefix("/").unwrap()
+                ),
+            },
             Some(ContentDetail::Unknown {}) | None => {
                 ContentPayload::Other("x/bb-api-is-shit".to_string())
             }
@@ -81,10 +97,10 @@ impl Content {
     }
 
     pub fn browser_link(&self) -> Option<&str> {
-        if let ContentPayload::Link(link) = &self.payload {
-            Some(link)
-        } else {
-            self.link.as_deref()
+        match &self.payload {
+            ContentPayload::Link(link) => Some(link),
+            ContentPayload::File { permanent_url, .. } => Some(permanent_url),
+            _ => self.link.as_deref(),
         }
     }
 }
@@ -103,6 +119,13 @@ pub enum ContentPayload {
 
     /// Something else. The contained string is the content handler, which might be a hint.
     Other(String),
+
+    /// A file, may meant to be downloaded or embedded.
+    File {
+        mime_type: String,
+        file_name: String,
+        permanent_url: String,
+    },
 }
 
 #[derive(Deserialize)]
@@ -165,8 +188,19 @@ enum ContentDetail {
     #[serde(rename = "resource/x-bb-lesson")]
     Lesson {},
 
+    #[serde(rename = "resource/x-bb-file")]
+    File { file: RawFile },
+
     #[serde(untagged)]
     Unknown {},
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawFile {
+    mime_type: String,
+    file_name: String,
+    permanent_url: String,
 }
 
 fn raw_body_str_or_struct<'de, D>(deserializer: D) -> Result<Option<RawContentBody>, D::Error>
