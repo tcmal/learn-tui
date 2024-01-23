@@ -10,7 +10,7 @@ impl Client {
     pub fn content_children(&self, course_id: &str, content_id: &str) -> Result<Vec<Content>> {
         Ok(self
             .get::<ContentChildrenResp>(&format!(
-                "learn/api/public/v1/courses/{}/contents/{}/children",
+                "learn/api/v1/courses/{}/contents/{}/children",
                 course_id, content_id
             ))?
             .results
@@ -22,7 +22,7 @@ impl Client {
     pub fn page_text(&self, course_id: &str, content_id: &str) -> Result<String> {
         let mut results = self
             .get::<ContentChildrenResp>(&format!(
-                "learn/api/public/v1/courses/{}/contents/{}/children",
+                "learn/api/v1/courses/{}/contents/{}/children",
                 course_id, content_id
             ))?
             .results;
@@ -55,19 +55,15 @@ pub struct Content {
 
 impl Content {
     fn new(mut raw: RawContent, course_id: &str) -> Self {
-        let payload = match raw
-            .content_detail
-            .filter(|d| !matches!(d, ContentDetail::Unknown))
-            .or(raw.content_handler)
-        {
+        let payload = match raw.content_detail {
             Some(ContentDetail::ExternalLink { url }) => ContentPayload::Link(url),
             Some(ContentDetail::Folder { is_page: true }) => ContentPayload::Page,
             Some(ContentDetail::Folder { is_page: false }) | Some(ContentDetail::Lesson {}) => {
                 ContentPayload::Folder
             }
-            Some(ContentDetail::Other(s)) => ContentPayload::Other(s),
-            None => ContentPayload::Other("resource/x-bb-api-is-shit".to_string()),
-            Some(ContentDetail::Unknown) => unreachable!(), // filter arm above
+            Some(ContentDetail::Unknown {}) | None => {
+                ContentPayload::Other("x/bb-api-is-shit".to_string())
+            }
         };
 
         Content {
@@ -75,10 +71,7 @@ impl Content {
             course_id: course_id.to_string(),
             title: raw.title,
             description: raw.description,
-            link: raw.body.and_then(|b| b.web_location).or(raw
-                .links
-                .pop()
-                .map(|l| format!("{}{}", LEARN_BASE, &l.href[1..]))),
+            link: raw.body.and_then(|b| b.web_location),
             payload,
         }
     }
@@ -139,11 +132,6 @@ struct RawContent {
     body: Option<RawContentBody>,
     #[serde(rename = "contentDetail")]
     content_detail: Option<ContentDetail>,
-    // sometimes this just contains the data that would be in content_detail in a different format! fun!
-    #[serde(rename = "contentHandler", deserialize_with = "handler_to_detail")]
-    content_handler: Option<ContentDetail>,
-
-    links: Vec<Link>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -169,74 +157,16 @@ enum ContentDetail {
     ExternalLink { url: String },
 
     #[serde(rename = "resource/x-bb-folder")]
-    Folder { is_page: bool },
+    Folder {
+        #[serde(rename = "isBbPage", default = "val_false")]
+        is_page: bool,
+    },
 
     #[serde(rename = "resource/x-bb-lesson")]
-    Lesson,
+    Lesson {},
 
-    #[serde(skip)]
-    Other(String),
-
-    #[serde(other)]
-    Unknown,
-}
-
-#[derive(Debug, Deserialize)]
-struct RawContentHandler {
-    id: String,
-    url: Option<String>,
-    #[serde(rename = "isBbPage")]
-    is_bb_page: Option<bool>,
-}
-
-fn handler_to_detail<'de, D>(deserializer: D) -> Result<Option<ContentDetail>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct StringOrStruct;
-
-    impl<'de> Visitor<'de> for StringOrStruct {
-        type Value = ContentDetail;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("string or map")
-        }
-
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(ContentDetail::Other(v.to_string()))
-        }
-
-        fn visit_map<M>(self, map: M) -> Result<Self::Value, M::Error>
-        where
-            M: MapAccess<'de>,
-        {
-            let raw: RawContentHandler =
-                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))?;
-
-            match raw {
-                RawContentHandler {
-                    id, url: Some(url), ..
-                } if id == "resource/x-bb-externallink" => Ok(ContentDetail::ExternalLink { url }),
-                RawContentHandler { id, is_bb_page, .. } if id == "resource/x-bb-folder" => {
-                    Ok(ContentDetail::Folder {
-                        is_page: is_bb_page.unwrap_or(false),
-                    })
-                }
-                RawContentHandler { id, .. } if id == "resource/x-bb-lesson" => {
-                    Ok(ContentDetail::Lesson)
-                }
-                RawContentHandler { id, .. } => Ok(ContentDetail::Other(id)),
-            }
-        }
-    }
-
-    match deserializer.deserialize_any(StringOrStruct) {
-        Ok(v) => Ok(Some(v)),
-        Err(_) => Ok(None),
-    }
+    #[serde(untagged)]
+    Unknown {},
 }
 
 fn raw_body_str_or_struct<'de, D>(deserializer: D) -> Result<Option<RawContentBody>, D::Error>
@@ -277,4 +207,8 @@ where
 }
 fn none<T>() -> Option<T> {
     None
+}
+
+fn val_false() -> bool {
+    false
 }
