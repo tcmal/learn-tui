@@ -25,6 +25,7 @@ fn test_ul() {
                 Span::styled("c", Style::new()),
             ]
             .into(),
+            vec![].into()
         ])
         .wrap(Wrap { trim: false })
     );
@@ -55,6 +56,7 @@ fn test_ul_multiline() {
                 Span::styled("c", Style::new()),
             ]
             .into(),
+            vec![].into()
         ])
         .wrap(Wrap { trim: false })
     );
@@ -80,6 +82,7 @@ fn test_ol() {
                 Span::styled("c", Style::new()),
             ]
             .into(),
+            vec![].into()
         ])
         .wrap(Wrap { trim: false })
     );
@@ -110,6 +113,61 @@ fn test_ol_multiline() {
                 Span::styled("c", Style::new()),
             ]
             .into(),
+            vec![].into()
+        ])
+        .wrap(Wrap { trim: false })
+    );
+}
+
+#[test]
+fn test_ul_nested() {
+    assert_eq!(
+        render("<ul><li>a</li><ul><li>b</li></ul><li>c</li></ul>"),
+        Paragraph::new(vec![
+            vec![
+                Span::styled("  - ", Style::new()),
+                Span::styled("a", Style::new()),
+            ]
+            .into(),
+            vec![
+                Span::styled("  ", Style::new()),
+                Span::styled("  - ", Style::new()),
+                Span::styled("b", Style::new()),
+            ]
+            .into(),
+            vec![
+                Span::styled("  - ", Style::new()),
+                Span::styled("c", Style::new()),
+            ]
+            .into(),
+            vec![].into()
+        ])
+        .wrap(Wrap { trim: false })
+    );
+}
+
+#[test]
+fn test_ol_nested() {
+    assert_eq!(
+        render("<ol><li>a</li><ol><li>b</li></ol><li>c</li></ol>"),
+        Paragraph::new(vec![
+            vec![
+                Span::styled("1. ", Style::new()),
+                Span::styled("a", Style::new()),
+            ]
+            .into(),
+            vec![
+                Span::styled("  ", Style::new()),
+                Span::styled("1. ", Style::new()),
+                Span::styled("b", Style::new()),
+            ]
+            .into(),
+            vec![
+                Span::styled("2. ", Style::new()),
+                Span::styled("c", Style::new()),
+            ]
+            .into(),
+            vec![].into()
         ])
         .wrap(Wrap { trim: false })
     );
