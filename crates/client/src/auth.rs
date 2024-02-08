@@ -23,13 +23,13 @@ pub enum Error {
     NoSAMLResponse(String),
 
     #[error("error communicating with learn: {}", .0)]
-    LearnReqError(Box<ureq::Error>),
+    LearnReqError(reqwest::Error),
 
     #[error("error communicating with EASE: {}", .0)]
-    EaseReqError(Box<ureq::Error>),
+    EaseReqError(reqwest::Error),
 
     #[error("error communicating with idp: {}", .0)]
-    IDPReqError(Box<ureq::Error>),
+    IDPReqError(reqwest::Error),
 
     #[error("misc I/O error: {}", .0)]
     IOError(#[from] std::io::Error),
@@ -47,19 +47,20 @@ impl Client {
         // Get once to set the cookies
         self.http
             .get("https://www.ease.ed.ac.uk/")
-            .call()
-            .map_err(|e| Error::EaseReqError(Box::new(e)))?;
+            .send()
+            .map_err(|e| Error::EaseReqError(e))?;
 
         // Login to CoSign
         let text = self
             .http
             .post("https://www.ease.ed.ac.uk/cosign.cgi")
-            .send_form(&[
-                ("login", &self.creds.0),
+            .form(&[
+                ("login", self.creds.0.as_str()),
                 ("password", self.creds.1.as_ref()),
             ])
-            .map_err(|e| Error::EaseReqError(Box::new(e)))?
-            .into_string()?;
+            .send()
+            .and_then(|r| r.text())
+            .map_err(|e| Error::EaseReqError(e))?;
 
         if !text.contains("/logout/logout.cgi") {
             return Err(Error::LoginFailed);
@@ -77,9 +78,9 @@ impl Client {
         let text = self
             .http
             .get(LEARN_LOGIN_URL)
-            .call()
-            .map_err(|e| Error::LearnReqError(Box::new(e)))?
-            .into_string()?;
+            .send()
+            .and_then(|r| r.text())
+            .map_err(|e| Error::LearnReqError(e))?;
 
         let samlreq_re = Regex::new(r#"name="SAMLRequest" value="([^"]*)""#).unwrap();
         let Some(caps) = samlreq_re.captures(&text) else {
@@ -91,9 +92,10 @@ impl Client {
         let text = self
             .http
             .post(SSO_SAML_URL)
-            .send_form(&[("SAMLRequest", samlreq)])
-            .map_err(|e| Error::IDPReqError(Box::new(e)))?
-            .into_string()?;
+            .form(&[("SAMLRequest", samlreq)])
+            .send()
+            .and_then(|t| t.text())
+            .map_err(|e| Error::IDPReqError(e))?;
         let samlresp_re = Regex::new(r#"name="SAMLResponse" value="([^"]*)""#).unwrap();
         let Some(caps) = samlresp_re.captures(&text) else {
             return Err(Error::NoSAMLResponse(text));
@@ -102,8 +104,9 @@ impl Client {
 
         self.http
             .post(LEARN_CALLBACK_URL)
-            .send_form(&[("SAMLResponse", samlresp)])
-            .map_err(|e| Error::LearnReqError(Box::new(e)))?;
+            .form(&[("SAMLResponse", samlresp)])
+            .send()
+            .map_err(|e| Error::LearnReqError(e))?;
 
         Ok(())
     }
@@ -111,8 +114,9 @@ impl Client {
     /// Serialise the auth state, for persistence
     pub fn auth_state(&self) -> AuthState {
         let mut ser = Vec::new();
-        self.http
-            .cookie_store()
+        self.cookies
+            .read()
+            .unwrap()
             .save_incl_expired_and_nonpersistent_json(&mut ser)
             .unwrap();
         AuthState(ser)
