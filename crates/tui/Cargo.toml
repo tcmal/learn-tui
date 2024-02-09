@@ -1,7 +1,13 @@
 [package]
 name = "edlearn_tui"
-version = "0.1.0"
+version = "0.0.1"
+description = "A TUI for Edinburgh Uni's Learn"
+homepage = "https://git.tardisproject.uk/tcmal/learn-tui"
+documentation = "https://docs.rs/edlearn_tui"
+repository = "https://git.tardisproject.uk/tcmal/learn-tui"
+readme = "../../README.md"
 edition = "2021"
+license = "GPL-3.0-only"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

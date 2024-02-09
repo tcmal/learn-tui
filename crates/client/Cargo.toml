@@ -1,17 +1,22 @@
 [package]
 name = "edlearn_client"
-version = "0.1.0"
+version = "0.0.1"
+description = "A client for Edinburgh Uni's Learn API"
+homepage = "https://git.tardisproject.uk/tcmal/learn-tui"
+documentation = "https://docs.rs/edlearn_client"
+repository = "https://git.tardisproject.uk/tcmal/learn-tui"
+readme = "../../README.md"
 edition = "2021"
+license = "GPL-3.0-only"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reqwest_cookie_store = "0.6.0"
-regex = "1.10.2"
-thiserror = "1.0.51"
-reqwest = { version = "0.11.24", features = ["blocking", "cookies",  "json"] }
-
+chrono = { version = "0.4.31", features = ["serde"] }
 log = { workspace = true }
+regex = "1.10.2"
+reqwest = { version = "0.11.24", features = ["blocking", "cookies",  "json"] }
+reqwest_cookie_store = "0.6.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
-chrono = { version = "0.4.31", features = ["serde"] }
+thiserror = "1.0.51"

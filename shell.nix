@@ -1,4 +1,4 @@
 {pkgs ? import <nixpkgs> {}}:
 pkgs.mkShell {
-  buildInputs = with pkgs; [openssl.dev pkg-config];
+  buildInputs = with pkgs; [openssl.dev pkg-config gnumake];
 }
