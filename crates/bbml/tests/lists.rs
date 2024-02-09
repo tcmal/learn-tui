@@ -8,7 +8,7 @@ use ratatui::{
 #[test]
 fn test_ul() {
     assert_eq!(
-        render("<ul><li>a</li><li>b</li><li>c</li></ul>"),
+        render("<ul><li>a</li><li>b</li><li>c</li></ul>").0,
         Paragraph::new(vec![
             vec![
                 Span::styled("  - ", Style::new()),
@@ -34,7 +34,7 @@ fn test_ul() {
 #[test]
 fn test_ul_multiline() {
     assert_eq!(
-        render("<ul><li>a<br>long list item</li><li>b</li><li>c</li></ul>"),
+        render("<ul><li>a<br>long list item</li><li>b</li><li>c</li></ul>").0,
         Paragraph::new(vec![
             vec![
                 Span::styled("  - ", Style::new()),
@@ -65,7 +65,7 @@ fn test_ul_multiline() {
 #[test]
 fn test_ol() {
     assert_eq!(
-        render("<ol><li>a</li><li>b</li><li>c</li></ul>"),
+        render("<ol><li>a</li><li>b</li><li>c</li></ul>").0,
         Paragraph::new(vec![
             vec![
                 Span::styled("1. ", Style::new()),
@@ -91,7 +91,7 @@ fn test_ol() {
 #[test]
 fn test_ol_multiline() {
     assert_eq!(
-        render("<ol><li>a<br>long list item</li><li>b</li><li>c</li></ul>"),
+        render("<ol><li>a<br>long list item</li><li>b</li><li>c</li></ul>").0,
         Paragraph::new(vec![
             vec![
                 Span::styled("1. ", Style::new()),
@@ -122,7 +122,7 @@ fn test_ol_multiline() {
 #[test]
 fn test_ul_nested() {
     assert_eq!(
-        render("<ul><li>a</li><ul><li>b</li></ul><li>c</li></ul>"),
+        render("<ul><li>a</li><ul><li>b</li></ul><li>c</li></ul>").0,
         Paragraph::new(vec![
             vec![
                 Span::styled("  - ", Style::new()),
@@ -149,7 +149,7 @@ fn test_ul_nested() {
 #[test]
 fn test_ol_nested() {
     assert_eq!(
-        render("<ol><li>a</li><ol><li>b</li></ol><li>c</li></ol>"),
+        render("<ol><li>a</li><ol><li>b</li></ol><li>c</li></ol>").0,
         Paragraph::new(vec![
             vec![
                 Span::styled("1. ", Style::new()),

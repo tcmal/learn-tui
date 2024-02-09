@@ -8,7 +8,7 @@ use ratatui::{
 #[test]
 fn test_br() {
     assert_eq!(
-        render("a<br>string"),
+        render("a<br>string").0,
         Paragraph::new(vec![
             vec![Span::styled("a", Style::new()),].into(),
             vec![Span::styled("string", Style::new()),].into(),
@@ -19,7 +19,7 @@ fn test_br() {
 #[test]
 fn test_br_multiple() {
     assert_eq!(
-        render("a<br><br>string"),
+        render("a<br><br>string").0,
         Paragraph::new(vec![
             vec![Span::styled("a", Style::new()),].into(),
             vec![].into(),
@@ -31,7 +31,7 @@ fn test_br_multiple() {
 #[test]
 fn test_linebreaks() {
     assert_eq!(
-        render("a\nmultiline\nstring"),
+        render("a\nmultiline\nstring").0,
         Paragraph::new(vec![
             vec![Span::styled("a", Style::new()),].into(),
             vec![Span::styled("multiline", Style::new()),].into(),

@@ -8,7 +8,7 @@ use ratatui::{
 #[test]
 fn test_h4() {
     assert_eq!(
-        render("<h4>header</h4>"),
+        render("<h4>header</h4>").0,
         Paragraph::new(vec![vec![Span::styled(
             "header",
             Style::new().bold().underline_color(Color::White)
@@ -21,7 +21,7 @@ fn test_h4() {
 #[test]
 fn test_h5() {
     assert_eq!(
-        render("<h5>header</h5>"),
+        render("<h5>header</h5>").0,
         Paragraph::new(vec![
             vec![Span::styled("header", Style::new().bold())].into(),
         ])
@@ -31,7 +31,7 @@ fn test_h5() {
 #[test]
 fn test_h6() {
     assert_eq!(
-        render("<h5>header</h5>"),
+        render("<h5>header</h5>").0,
         Paragraph::new(vec![
             vec![Span::styled("header", Style::new().bold())].into(),
         ])

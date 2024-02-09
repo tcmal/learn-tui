@@ -1,5 +1,6 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 use edlearn_client::content::ContentPayload;
+use log::debug;
 use ratatui::{
     prelude::{Margin, Rect},
     style::{Color, Modifier, Style, Stylize},
@@ -41,6 +42,13 @@ pub struct Viewer {
 
     /// A cached render of what we're displaying, to avoid constantly re-creating.
     cached_render: Option<Paragraph<'static>>,
+
+    /// A list of links we're displaying. The user can specify an index to visit them
+    displayed_links: Vec<String>,
+
+    link_idx_max_digits: usize,
+    link_entry_acc: usize,
+    link_entry_digits: Option<usize>,
 }
 
 impl Viewer {
@@ -49,6 +57,7 @@ impl Viewer {
         self.show = d;
         self.y_offset = 0;
         self.cached_render = None;
+        self.displayed_links = vec![];
     }
 
     /// Render the current document, updating the render cache if necessary
@@ -113,7 +122,9 @@ impl Viewer {
                     store.request_page_text(content_idx);
                     return None;
                 };
-                Some(bbml::render(text))
+                let (text, links) = bbml::render(text);
+                self.set_displayed_links(links);
+                Some(text)
             }
             ContentPayload::Link(l) => Some(Paragraph::new(format!("Link to {}. Open with b", l))),
             ContentPayload::Folder => Some(Paragraph::new("Folder")),
@@ -137,6 +148,20 @@ impl Viewer {
                 Line::raw("File an issue, and in the meantime open in your browser with b."),
             ])),
         }
+    }
+
+    fn set_displayed_links(&mut self, links: Vec<String>) {
+        self.link_idx_max_digits = if !links.is_empty() {
+            links.len().ilog10() as usize + 1
+        } else {
+            0
+        };
+        self.displayed_links = links;
+        debug!(
+            "displaying {} links (max digits = {})",
+            self.displayed_links.len(),
+            self.link_idx_max_digits
+        );
     }
 }
 
@@ -210,6 +235,43 @@ impl Pane for Viewer {
                     store.download_content(content_idx);
                 };
             }
+
+            // Link index entry
+            KeyCode::Char('f') => {
+                if self.link_idx_max_digits > 0 {
+                    self.link_entry_acc = 0;
+                    self.link_entry_digits = Some(0);
+                }
+            }
+            KeyCode::Char(n) if n.is_digit(10) => match self.link_entry_digits.as_mut() {
+                Some(idx) => {
+                    // add new digit to end of number
+                    self.link_entry_acc *= 10;
+                    self.link_entry_acc += n.to_digit(10).unwrap() as usize;
+                    *idx += 1;
+
+                    // check if done entering
+                    debug!(
+                        "entered {idx} digits / {}. acc = {}",
+                        self.link_idx_max_digits, self.link_entry_acc
+                    );
+                    if *idx == self.link_idx_max_digits {
+                        let Some(href) = self.displayed_links.get(self.link_entry_acc) else {
+                            debug!("invalid idx");
+                            return Action::None; // TODO: show this somehow
+                        };
+
+                        if let Err(_) = open::that(href) {
+                            todo!("deal with open error");
+                        }
+
+                        self.link_entry_acc = 0;
+                        self.link_entry_digits = None;
+                    }
+                }
+                None => (),
+            },
+
             _ => (),
         };
 

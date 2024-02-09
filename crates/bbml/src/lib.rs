@@ -7,13 +7,14 @@ use ratatui::{
 use tl::{Node, NodeHandle, VDom};
 
 /// Render the given bbml as best as possible.
-pub fn render(html: &str) -> Paragraph<'static> {
-    let state = RenderState::new(html);
-    let mut text = state.render();
+/// Returns the rendered text as a paragraph, and a list of links inside that text
+pub fn render(html: &str) -> (Paragraph<'static>, Vec<String>) {
+    let mut state = RenderState::new(html);
+    let (mut text, links) = state.render();
 
     cleanup(&mut text);
 
-    Paragraph::new(text).wrap(Wrap { trim: false })
+    (Paragraph::new(text).wrap(Wrap { trim: false }), links)
 }
 
 /// State needed throughout the rendering process
@@ -30,22 +31,25 @@ impl<'a> RenderState<'a> {
     }
 
     /// Render everything into a text object
-    fn render(&self) -> Text<'static> {
+    fn render(&mut self) -> (Text<'static>, Vec<String>) {
         let mut text = Text {
             lines: vec![Line {
                 spans: vec![],
                 alignment: None,
             }],
         };
+        let mut links = vec![];
+        let mut out = RenderOutput::new(&mut text, &mut links);
+
         for child in self.dom.children() {
-            self.render_internal(&mut text, child, Style::default());
+            self.render_internal(&mut out, child, Style::default());
         }
 
-        text
+        (text, links)
     }
 
     /// Actual internal rendering function
-    fn render_internal(&self, text: &mut Text<'static>, handle: &NodeHandle, curr_style: Style) {
+    fn render_internal(&self, out: &mut RenderOutput, handle: &NodeHandle, curr_style: Style) {
         let node = handle.get(self.dom.parser()).unwrap();
         match node {
             Node::Tag(t) => {
@@ -53,7 +57,7 @@ impl<'a> RenderState<'a> {
                 let c = t.children();
                 let children = c.top();
                 match tag_name {
-                    "br" => newline(text),
+                    "br" => out.newline(),
 
                     // Block text elements, which force their own line and may change the style
                     "h4" | "h5" | "h6" | "div" | "p" => {
@@ -66,24 +70,37 @@ impl<'a> RenderState<'a> {
                             _ => unreachable!(),
                         };
 
-                        ensure_line_empty(text);
+                        out.ensure_line_empty();
                         for child in children.iter() {
-                            self.render_internal(text, child, new_style);
+                            self.render_internal(out, child, new_style);
                         }
-                        ensure_line_empty(text);
+                        out.ensure_line_empty();
                     }
 
                     // Inline text elements, which at most change the style
-                    "span" | "strong" | "em" | "a" | "li" => {
+                    "span" | "strong" | "em" | "li" => {
                         let new_style = match tag_name {
-                            "a" => curr_style.fg(Color::Blue),
                             "strong" => curr_style.add_modifier(Modifier::BOLD),
                             "em" => curr_style.add_modifier(Modifier::ITALIC),
                             _ => curr_style,
                         };
 
                         for child in children.iter() {
-                            self.render_internal(text, child, new_style);
+                            self.render_internal(out, child, new_style);
+                        }
+                    }
+
+                    // Links
+                    "a" => {
+                        let new_style = curr_style.fg(Color::Blue);
+                        for child in children.iter() {
+                            self.render_internal(out, child, new_style);
+                        }
+                        if let Some(Some(b)) = t.attributes().get("href") {
+                            let href = b.as_utf8_str().to_string();
+                            let idx = out.add_link(href);
+
+                            out.append(Span::styled(format!("[{idx}]"), new_style));
                         }
                     }
 
@@ -105,12 +122,14 @@ impl<'a> RenderState<'a> {
                         for child in children.iter() {
                             // Render into new text object
                             let mut subtext = Text::raw("");
+                            let mut suboutp = out.with_subtext(&mut subtext);
                             let child_node = child.get(self.dom.parser()).unwrap();
-                            self.render_internal(&mut subtext, child, curr_style);
+                            self.render_internal(&mut suboutp, child, curr_style);
 
-                            if empty_or_whitespace(&subtext) {
+                            if suboutp.empty_or_whitespace() {
                                 continue;
                             }
+                            drop(suboutp);
 
                             match child_node {
                                 // Sublists don't use <li>s
@@ -137,12 +156,12 @@ impl<'a> RenderState<'a> {
                                 }
                             };
 
-                            text.lines.extend(subtext.lines);
+                            out.text.lines.extend(subtext.lines);
                         }
 
                         // padding
-                        ensure_line_empty(text);
-                        newline(text);
+                        out.ensure_line_empty();
+                        out.newline();
                     }
 
                     // Gracefully degrade on unknown tags
@@ -150,7 +169,7 @@ impl<'a> RenderState<'a> {
                         log::error!("unknown tag: {}", s);
                         t.children().top().iter().for_each(|child| {
                             self.render_internal(
-                                text,
+                                out,
                                 child,
                                 curr_style.fg(Color::Red).underline_color(Color::Red),
                             )
@@ -162,11 +181,11 @@ impl<'a> RenderState<'a> {
             Node::Raw(s) => {
                 let s = collapse_whitespace(&s.as_utf8_str());
                 if !s.contains('\n') {
-                    append(text, Span::styled(s, curr_style));
+                    out.append(Span::styled(s, curr_style));
                 } else {
                     for l in s.split('\n') {
-                        append(text, Span::styled(l.to_string(), curr_style));
-                        newline(text);
+                        out.append(Span::styled(l.to_string(), curr_style));
+                        out.newline();
                     }
                 }
             }
@@ -175,38 +194,66 @@ impl<'a> RenderState<'a> {
     }
 }
 
-/// Add a newline to the text
-fn newline(text: &mut Text<'static>) {
-    text.lines.push(Line {
-        spans: vec![],
-        alignment: None,
-    });
+struct RenderOutput<'a> {
+    text: &'a mut Text<'static>,
+    links: &'a mut Vec<String>,
 }
 
-/// Ensure that the last line of the text is empty
-fn ensure_line_empty(text: &mut Text<'static>) {
-    if !currline_empty(text) {
-        newline(text);
+impl<'a> RenderOutput<'a> {
+    fn new(text: &'a mut Text<'static>, links: &'a mut Vec<String>) -> Self {
+        Self { text, links }
     }
-}
-/// Append a span to the last line of the text
-fn append(text: &mut Text<'static>, span: Span<'static>) {
-    match text.lines.last_mut() {
-        Some(l) => l.spans.push(span),
-        None => text.lines.push(span.into()),
-    };
-}
 
-/// Check if the current line is empty
-fn currline_empty(text: &Text<'static>) -> bool {
-    text.lines.is_empty() || text.lines[text.lines.len() - 1].spans.is_empty()
-}
+    /// Add a newline to the text
+    fn newline(&mut self) {
+        self.text.lines.push(Line {
+            spans: vec![],
+            alignment: None,
+        });
+    }
 
-/// Check if the given text is empty or only whitespace
-fn empty_or_whitespace(text: &Text<'static>) -> bool {
-    text.lines
-        .iter()
-        .all(|l| l.spans.iter().all(|s| s.content.is_empty()))
+    /// Ensure that the last line of the text is empty
+    fn ensure_line_empty(&mut self) {
+        if !self.currline_empty() {
+            self.newline();
+        }
+    }
+    /// Append a span to the last line of the text
+    fn append(&mut self, span: Span<'static>) {
+        match self.text.lines.last_mut() {
+            Some(l) => l.spans.push(span),
+            None => self.text.lines.push(span.into()),
+        };
+    }
+
+    /// Check if the current line is empty
+    fn currline_empty(&mut self) -> bool {
+        self.text.lines.is_empty() || self.text.lines[self.text.lines.len() - 1].spans.is_empty()
+    }
+
+    /// Check if the given text is empty or only whitespace
+    fn empty_or_whitespace(&mut self) -> bool {
+        self.text
+            .lines
+            .iter()
+            .all(|l| l.spans.iter().all(|s| s.content.is_empty()))
+    }
+
+    /// Add a link to the encountered list, returning its index
+    fn add_link(&mut self, href: String) -> usize {
+        self.links.push(href);
+        self.links.len() - 1
+    }
+
+    fn with_subtext<'b>(&'b mut self, subtext: &'b mut Text<'static>) -> RenderOutput<'b>
+    where
+        'a: 'b,
+    {
+        RenderOutput {
+            text: subtext,
+            links: &mut self.links,
+        }
+    }
 }
 
 /// Collapse all whitespace in a string
@@ -228,7 +275,7 @@ fn collapse_whitespace(s: &str) -> String {
 }
 
 /// Cleans up text, removing empty spans and leading/trailing lines
-fn cleanup(text: &mut Text) {
+fn cleanup(text: &mut Text<'static>) {
     text.lines
         .iter_mut()
         .for_each(|l| l.spans.retain(|s| !s.content.is_empty()));
