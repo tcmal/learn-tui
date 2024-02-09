@@ -109,7 +109,10 @@ impl Viewer {
         let content = store.content(content_idx);
         match &content.payload {
             ContentPayload::Page => {
-                let text = store.page_text(content_idx)?;
+                let Some(text) = store.page_text(content_idx) else {
+                    store.request_page_text(content_idx);
+                    return None;
+                };
                 Some(bbml::render(text))
             }
             ContentPayload::Link(l) => Some(Paragraph::new(format!("Link to {}. Open with b", l))),
