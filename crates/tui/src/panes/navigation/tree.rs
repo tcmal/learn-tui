@@ -21,7 +21,7 @@ pub enum NavTree {
     /// A placeholder to show that the whole tree is loading.
     Loading,
 
-    /// A header, which can't be selected and is just decorative
+    /// A header, used for other things
     Header { ty: HeaderTy },
 }
 
@@ -36,6 +36,7 @@ pub enum NodeTy {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HeaderTy {
     Welcome,
+    Downloads,
     Term(TermIdx),
 }
 impl HeaderTy {
@@ -43,6 +44,14 @@ impl HeaderTy {
         let title = match self {
             HeaderTy::Term(idx) => store.courses_by_term().unwrap()[*idx].0.clone(),
             HeaderTy::Welcome => "Welcome".to_string(),
+            HeaderTy::Downloads => {
+                let (completed, total) = store.download_queue_summary();
+                if total > 0 {
+                    format!("Downloads ({} / {})", completed, total)
+                } else {
+                    "Downloads".to_string()
+                }
+            }
         };
 
         TreeItem::new_leaf(
@@ -58,6 +67,7 @@ impl HeaderTy {
         match self {
             HeaderTy::Term(i) => TreeId::TermHeader(*i),
             HeaderTy::Welcome => TreeId::Welcome,
+            HeaderTy::Downloads => TreeId::Downloads,
         }
     }
 }
@@ -85,6 +95,7 @@ pub enum TreeId {
     ContentLoading(CourseIdx),
     Loading,
     Welcome,
+    Downloads,
 }
 
 impl NavTree {
@@ -136,6 +147,12 @@ impl NavTree {
                     ty: HeaderTy::Welcome,
                 },
                 TreeId::Welcome,
+            ) => true,
+            (
+                NavTree::Header {
+                    ty: HeaderTy::Downloads,
+                },
+                TreeId::Downloads,
             ) => true,
             _ => false,
         }

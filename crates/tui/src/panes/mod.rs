@@ -11,5 +11,5 @@ pub use viewer::{Document, Viewer};
 
 pub trait Pane {
     fn draw(&mut self, store: &Store, frame: &mut Frame, area: Rect);
-    fn handle_event(&mut self, store: &Store, key: Event) -> Result<Action>;
+    fn handle_event(&mut self, store: &mut Store, key: Event) -> Result<Action>;
 }

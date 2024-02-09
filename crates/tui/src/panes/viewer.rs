@@ -11,7 +11,7 @@ use ratatui::{
 
 use crate::{
     event::Event,
-    store::{ContentIdx, Store},
+    store::{ContentIdx, DownloadState, Store},
 };
 
 use super::{Action, Pane};
@@ -20,6 +20,7 @@ use super::{Action, Pane};
 pub enum Document {
     #[default]
     Welcome,
+    Downloads,
     Content(ContentIdx),
 }
 
@@ -85,6 +86,28 @@ impl Pane for Viewer {
                     self.cached_render = Some(p.clone());
                     p
                 }
+                Document::Downloads => Paragraph::new(
+                    store
+                        .download_queue()
+                        .flat_map(|(req, state)| {
+                            vec![
+                                vec![
+                                    req.orig_filename.to_string().blue(),
+                                    match &state {
+                                        DownloadState::Queued => " - Queued".gray(),
+                                        DownloadState::InProgress(p) => {
+                                            format!(" - {:.2}%", p * 100.0).blue()
+                                        }
+                                        DownloadState::Completed => " - Completed".green(),
+                                        DownloadState::Errored(e) => format!(" - {e}").red(),
+                                    },
+                                ]
+                                .into(),
+                                vec![req.dest.to_string().gray()].into(),
+                            ]
+                        })
+                        .collect::<Vec<Line>>(),
+                ),
             });
 
         let line_count = rendered.line_count(area.width);
@@ -110,7 +133,7 @@ impl Pane for Viewer {
         frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
     }
 
-    fn handle_event(&mut self, store: &Store, event: Event) -> Result<Action> {
+    fn handle_event(&mut self, store: &mut Store, event: Event) -> Result<Action> {
         let Event::Key(key) = event else {
             return Ok(Action::None);
         };
@@ -139,6 +162,12 @@ impl Pane for Viewer {
                 if let Document::Content(content_idx) = self.show {
                     let content = store.content(content_idx);
                     open::that(content.browser_link())?;
+                };
+            }
+
+            KeyCode::Char('d') => {
+                if let Document::Content(content_idx) = self.show {
+                    store.download_content(content_idx);
                 };
             }
             _ => (),

@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 pub use auth::{AuthState, Credentials, Error as AuthError, Password};
 use log::debug;
-use reqwest::blocking::{Client as HTTPClient, ClientBuilder as HTTPClientBuilder};
+use reqwest::blocking::{Client as HTTPClient, ClientBuilder as HTTPClientBuilder, Response};
 use reqwest_cookie_store::{CookieStore, CookieStoreRwLock};
 use serde::Deserialize;
 use thiserror::Error;
@@ -87,6 +87,11 @@ impl Client {
         }
     }
 
+    /// Get the underlying HTTP client.
+    pub fn http(&self) -> &HTTPClient {
+        &self.http
+    }
+
     /// Wrapper for attempting a request, and re-trying if it fails for authentication reasons
     pub fn with_reattempt_auth<T, F>(&self, mut f: F) -> Result<T, Error>
     where
@@ -94,6 +99,7 @@ impl Client {
     {
         match f() {
             Err(Error::HTTPError(e)) => {
+                debug!("http error: {e}");
                 if e.status().filter(|c| c.as_u16() / 100 == 4).is_some() {
                     self.authenticate()?;
                     f()
@@ -107,7 +113,12 @@ impl Client {
 
     pub(crate) fn get<T: for<'a> Deserialize<'a>>(&self, url: &str) -> Result<T, Error> {
         self.with_reattempt_auth(|| {
-            let resp = self.http.get(format!("{}{}", LEARN_BASE, url)).send()?;
+            let resp = self
+                .http
+                .get(format!("{}{}", LEARN_BASE, url))
+                .send()
+                .and_then(Response::error_for_status)?
+                .error_for_status()?;
             if log::log_enabled!(log::Level::Debug) {
                 let s = resp.text()?;
                 debug!("response: {}", s);
@@ -124,7 +135,8 @@ impl Client {
             Ok(self
                 .http
                 .get(format!("{}institution/api/health", LEARN_BASE))
-                .send()?
+                .send()
+                .and_then(Response::error_for_status)?
                 .json()?)
         })
     }

@@ -3,6 +3,7 @@
 //! Thank you to @kilolympus and @chaives for figuring out the login process
 //! See: https://git.tardisproject.uk/kilo/echo360-downloader
 use regex::Regex;
+use reqwest::blocking::Response;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -48,6 +49,7 @@ impl Client {
         self.http
             .get("https://www.ease.ed.ac.uk/")
             .send()
+            .and_then(Response::error_for_status)
             .map_err(Error::EaseReqError)?;
 
         // Login to CoSign
@@ -59,6 +61,7 @@ impl Client {
                 ("password", self.creds.1.as_ref()),
             ])
             .send()
+            .and_then(Response::error_for_status)
             .and_then(|r| r.text())
             .map_err(Error::EaseReqError)?;
 
@@ -79,6 +82,7 @@ impl Client {
             .http
             .get(LEARN_LOGIN_URL)
             .send()
+            .and_then(Response::error_for_status)
             .and_then(|r| r.text())
             .map_err(Error::LearnReqError)?;
 
@@ -94,6 +98,7 @@ impl Client {
             .post(SSO_SAML_URL)
             .form(&[("SAMLRequest", samlreq)])
             .send()
+            .and_then(Response::error_for_status)
             .and_then(|t| t.text())
             .map_err(Error::IDPReqError)?;
         let samlresp_re = Regex::new(r#"name="SAMLResponse" value="([^"]*)""#).unwrap();
@@ -106,6 +111,7 @@ impl Client {
             .post(LEARN_CALLBACK_URL)
             .form(&[("SAMLResponse", samlresp)])
             .send()
+            .and_then(Response::error_for_status)
             .map_err(Error::LearnReqError)?;
 
         Ok(())

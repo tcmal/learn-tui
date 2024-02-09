@@ -143,8 +143,8 @@ impl Screen for MainScreen {
         let action = match event {
             Event::Store(s) => self.store.event(s),
             x => match self.viewer_focused {
-                true => self.viewer.handle_event(&self.store, x),
-                false => self.navigation.handle_event(&self.store, x),
+                true => self.viewer.handle_event(&mut self.store, x),
+                false => self.navigation.handle_event(&mut self.store, x),
             }?,
         };
 

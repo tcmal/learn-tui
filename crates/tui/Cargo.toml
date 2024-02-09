@@ -18,3 +18,4 @@ simplelog = "0.12.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 open = "5.0.1"
+camino = "1.1.6"

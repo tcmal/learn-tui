@@ -6,6 +6,7 @@ use bblearn_api::{
     users::User,
     Client,
 };
+use camino::Utf8PathBuf;
 use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 
 mod downloader;
@@ -16,9 +17,12 @@ use worker::Worker;
 
 use crate::{event::EventBus, main_screen::Action};
 
+pub use self::downloader::{DownloadReq, DownloadState};
+
 pub type TermIdx = usize;
 pub type CourseIdx = usize;
 pub type ContentIdx = usize;
+pub type DownloadRef = usize;
 
 /// Global data store
 pub struct Store {
@@ -31,6 +35,9 @@ pub struct Store {
     course_contents: HashMap<CourseIdx, Range<ContentIdx>>,
 
     page_texts: HashMap<ContentIdx, String>,
+
+    download_queue: HashMap<DownloadRef, (DownloadReq, DownloadState)>,
+    next_download_ref: DownloadRef,
 
     worker_channel: Sender<Request>,
     downloader_channel: Sender<DownloaderRequest>,
@@ -57,7 +64,9 @@ enum Request {
 }
 
 #[derive(Debug)]
-enum DownloaderRequest {}
+enum DownloaderRequest {
+    DoDownload(DownloadRef, DownloadReq),
+}
 
 /// Messages received by the app from the worker or downloader thread
 #[derive(Debug)]
@@ -76,6 +85,7 @@ pub enum Event {
         content_idx: ContentIdx,
         text: String,
     },
+    DownloadState(DownloadRef, DownloadState),
 }
 
 impl Store {
@@ -93,6 +103,8 @@ impl Store {
             content_children: Default::default(),
             contents: Default::default(),
             page_texts: Default::default(),
+            download_queue: Default::default(),
+            next_download_ref: Default::default(),
         })
     }
 
@@ -178,6 +190,47 @@ impl Store {
         &self.my_courses().unwrap()[course_idx]
     }
 
+    pub fn download_content(&mut self, content_idx: ContentIdx) {
+        let content = self.content(content_idx);
+        if let ContentPayload::File {
+            file_name,
+            permanent_url,
+            ..
+        } = &content.payload
+        {
+            // TODO
+            let dest = Utf8PathBuf::from(format!("./{}", file_name));
+            let req = DownloadReq {
+                url: permanent_url.to_string(),
+                orig_filename: file_name.to_string(),
+                dest,
+            };
+            let r = self.next_download_ref;
+            self.next_download_ref += 1;
+            self.download_queue
+                .insert(r, (req.clone(), DownloadState::Queued));
+            self.downloader_channel
+                .send(DownloaderRequest::DoDownload(r, req))
+                .unwrap();
+        }
+    }
+
+    /// Get a summary of the current download queue.
+    /// Returns (completed, total)
+    pub fn download_queue_summary(&self) -> (usize, usize) {
+        (
+            self.download_queue
+                .iter()
+                .filter(|(_, (_, state))| matches!(state, DownloadState::Completed))
+                .count(),
+            self.download_queue.len(),
+        )
+    }
+
+    pub fn download_queue(&self) -> impl Iterator<Item = &(DownloadReq, DownloadState)> {
+        self.download_queue.values()
+    }
+
     pub fn event(&mut self, e: Event) -> Action {
         match e {
             Event::Error(bblearn_api::Error::AuthError(_)) => return Action::Reauthenticate,
@@ -223,6 +276,9 @@ impl Store {
             }
             Event::PageText { content_idx, text } => {
                 self.page_texts.insert(content_idx, text);
+            }
+            Event::DownloadState(r, state) => {
+                self.download_queue.entry(r).and_modify(|s| s.1 = state);
             }
         };
 

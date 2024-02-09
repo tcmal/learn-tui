@@ -15,6 +15,7 @@ pub struct Navigation {
     tree_state: TreeState<TreeId>,
     nav_tree: Vec<NavTree>,
     cached_view_tree: Option<Vec<TreeItem<'static, TreeId>>>,
+    last_download_summary: (usize, usize),
 }
 
 impl Pane for Navigation {
@@ -38,7 +39,7 @@ impl Pane for Navigation {
         );
     }
 
-    fn handle_event(&mut self, store: &Store, event: Event) -> Result<Action> {
+    fn handle_event(&mut self, store: &mut Store, event: Event) -> Result<Action> {
         let Event::Key(key) = event else {
             return Ok(Action::None);
         };
@@ -85,6 +86,11 @@ impl Pane for Navigation {
                         ty: HeaderTy::Welcome,
                     } => {
                         return Ok(Action::Show(Document::Welcome));
+                    }
+                    NavTree::Header {
+                        ty: HeaderTy::Downloads,
+                    } => {
+                        return Ok(Action::Show(Document::Downloads));
                     }
 
                     // do nothing on loading stuff
@@ -135,6 +141,9 @@ impl Navigation {
                 self.nav_tree.push(NavTree::Header {
                     ty: HeaderTy::Welcome,
                 });
+                self.nav_tree.push(NavTree::Header {
+                    ty: HeaderTy::Downloads,
+                });
                 for (term_idx, (_, courses)) in all_courses.iter().enumerate() {
                     self.nav_tree.push(NavTree::Header {
                         ty: HeaderTy::Term(term_idx),
@@ -157,18 +166,27 @@ impl Navigation {
 
         // loaded/partially loaded tree
         for item in self.nav_tree.iter_mut() {
-            if let NavTree::Node {
-                ty: NodeTy::Course(course_idx),
-                ..
-            } = &item
-            {
-                changed |= Self::refresh_subtree(
-                    &mut self.tree_state,
-                    store,
-                    &mut vec![TreeId::Course(*course_idx)],
-                    item,
-                );
-            }
+            match &item {
+                NavTree::Node {
+                    ty: NodeTy::Course(course_idx),
+                    ..
+                } => {
+                    changed |= Self::refresh_subtree(
+                        &mut self.tree_state,
+                        store,
+                        &mut vec![TreeId::Course(*course_idx)],
+                        item,
+                    );
+                }
+                NavTree::Header {
+                    ty: HeaderTy::Downloads,
+                } => {
+                    let summary = store.download_queue_summary();
+                    changed |= summary != self.last_download_summary;
+                    self.last_download_summary = summary;
+                }
+                _ => (),
+            };
         }
 
         changed
