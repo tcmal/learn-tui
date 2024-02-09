@@ -12,7 +12,6 @@ use ratatui::{
 
 use crate::{
     auth_cache::{AuthCache, LoginDetails},
-    downloader::Downloader,
     event::{Event, EventBus},
     login_prompt::LoginPrompt,
     panes::{Document, Navigation, Pane, Viewer},
@@ -28,29 +27,12 @@ pub enum Action {
     Reauthenticate,
 }
 
-pub struct AppState {
-    /// Main data store
-    pub store: Store,
-
-    /// Worker for downloading files
-    pub downloader: Downloader,
-}
-
-impl AppState {
-    pub fn new(events: &EventBus, client: &Client) -> Result<Self> {
-        Ok(Self {
-            store: Store::new(events, client.clone_sharing_state())?,
-            downloader: Downloader::new(events, client.clone_sharing_state())?,
-        })
-    }
-}
-
 /// Holds application-related state
 pub struct MainScreen {
     /// Handle to the client we're using, so we can save auth state when we exit
     client: Client,
 
-    state: AppState,
+    store: Store,
 
     /// UI Components & State
     navigation: Navigation,
@@ -74,7 +56,7 @@ impl MainScreen {
         };
 
         Ok(Self {
-            state: AppState::new(&events, &client)?,
+            store: Store::new(&events, client.clone_sharing_state())?,
             events,
             client,
             navigation: Navigation::default(),
@@ -121,8 +103,8 @@ impl Screen for MainScreen {
         )
         .split(content_rect);
 
-        self.navigation.draw(&self.state, frame, layout[0]);
-        self.viewer.draw(&self.state, frame, layout[2]);
+        self.navigation.draw(&self.store, frame, layout[0]);
+        self.viewer.draw(&self.store, frame, layout[2]);
 
         // Draw a focus rectangle around one of them.
         let focus_rect = if !self.viewer_focused {
@@ -159,11 +141,10 @@ impl Screen for MainScreen {
         }
 
         let action = match event {
-            Event::Store(s) => self.state.store.event(s),
-            Event::Downloader(d) => self.state.downloader.event(d),
+            Event::Store(s) => self.store.event(s),
             x => match self.viewer_focused {
-                true => self.viewer.handle_event(&self.state, x),
-                false => self.navigation.handle_event(&self.state, x),
+                true => self.viewer.handle_event(&self.store, x),
+                false => self.navigation.handle_event(&self.store, x),
             }?,
         };
 

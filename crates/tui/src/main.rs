@@ -12,7 +12,6 @@ use crate::{
 };
 
 mod auth_cache;
-mod downloader;
 mod event;
 mod login_prompt;
 mod main_screen;

@@ -4,7 +4,7 @@ use ratatui::{prelude::Rect, Frame};
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use super::{Action, Document, Pane};
-use crate::{event::Event, main_screen::AppState, store::Store};
+use crate::{event::Event, store::Store};
 
 mod tree;
 use tree::*;
@@ -18,13 +18,13 @@ pub struct Navigation {
 }
 
 impl Pane for Navigation {
-    fn draw(&mut self, state: &AppState, frame: &mut Frame, area: Rect) {
-        if self.refresh_tree(&state.store) || self.cached_view_tree.is_none() {
+    fn draw(&mut self, store: &Store, frame: &mut Frame, area: Rect) {
+        if self.refresh_tree(&store) || self.cached_view_tree.is_none() {
             // changed, so refresh view tree
             self.cached_view_tree = Some(
                 self.nav_tree
                     .iter()
-                    .map(|i| i.as_treeitem(&state.store))
+                    .map(|i| i.as_treeitem(&store))
                     .collect(),
             );
         }
@@ -38,7 +38,7 @@ impl Pane for Navigation {
         );
     }
 
-    fn handle_event(&mut self, state: &AppState, event: Event) -> Result<Action> {
+    fn handle_event(&mut self, store: &Store, event: Event) -> Result<Action> {
         let Event::Key(key) = event else {
             return Ok(Action::None);
         };
@@ -71,7 +71,7 @@ impl Pane for Navigation {
                         ty,
                         children: children @ NavTreeChildren::NotRequested,
                     } => {
-                        ty.request_children(&state.store);
+                        ty.request_children(store);
                         *children = NavTreeChildren::Loading;
                         self.tree_state.open(sel);
                         self.cached_view_tree = None;
@@ -105,7 +105,7 @@ impl Pane for Navigation {
                     ..
                 } = sel_node
                 {
-                    let content = state.store.content(*content_idx);
+                    let content = store.content(*content_idx);
                     open::that(content.browser_link())?;
                 }
             }

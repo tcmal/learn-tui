@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use crate::{downloader, store};
+use crate::store;
 
 /// An event our app may receive
 #[derive(Debug)]
@@ -24,9 +24,6 @@ pub enum Event {
 
     /// Some data for the store, sent by the worker.
     Store(store::Event),
-
-    /// Some data for the downloader, sent by the worker
-    Downloader(downloader::Event),
 }
 
 /// The event bus aggregates events from multiple threads, and joins them all back when required.

@@ -8,6 +8,9 @@ use bblearn_api::{
 };
 use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 
+mod downloader;
+use downloader::Downloader;
+
 mod worker;
 use worker::Worker;
 
@@ -30,6 +33,7 @@ pub struct Store {
     page_texts: HashMap<ContentIdx, String>,
 
     worker_channel: Sender<Request>,
+    downloader_channel: Sender<DownloaderRequest>,
 }
 
 /// Requests sent to the worker thread
@@ -52,7 +56,10 @@ enum Request {
     },
 }
 
-/// Messages received by the app from the worker thread
+#[derive(Debug)]
+enum DownloaderRequest {}
+
+/// Messages received by the app from the worker or downloader thread
 #[derive(Debug)]
 pub enum Event {
     Error(bblearn_api::Error),
@@ -73,10 +80,12 @@ pub enum Event {
 
 impl Store {
     pub fn new(bus: &EventBus, client: Client) -> Result<Self> {
-        let worker_channel = Worker::spawn_on(bus, client)?;
+        let worker_channel = Worker::spawn_on(bus, client.clone_sharing_state())?;
+        let downloader_channel = Downloader::spawn_on(bus, client)?;
 
         Ok(Self {
             worker_channel,
+            downloader_channel,
             me: Default::default(),
             courses_by_term: Default::default(),
             courses: Default::default(),
