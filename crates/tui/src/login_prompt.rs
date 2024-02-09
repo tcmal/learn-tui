@@ -13,6 +13,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
+/// Prompts the user for their credentials
 pub struct LoginPrompt {
     username: String,
     password: String,
@@ -23,6 +24,8 @@ pub struct LoginPrompt {
 }
 
 impl LoginPrompt {
+    /// Create a blank form for credentials.
+    /// The given [`EventBus`] will be used to initialise the [`MainScreen`] once the user submits.
     pub fn new(events: Rc<EventBus>) -> Self {
         Self {
             events,
@@ -34,6 +37,8 @@ impl LoginPrompt {
         }
     }
 
+    /// Create a blank form with the given message.
+    /// This can be used to re-prompt for authentication, etc.
     pub fn new_with_msg(events: Rc<EventBus>, message: &'static str) -> Self {
         Self {
             events,
@@ -48,6 +53,7 @@ impl LoginPrompt {
 
 impl Screen for LoginPrompt {
     fn draw(&mut self, frame: &mut ratatui::Frame) {
+        // TODO: Ugly layout code that could probably be replaced with flexbox
         let horiz_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(Constraint::from_percentages([25, 50, 25]))
@@ -93,15 +99,18 @@ impl Screen for LoginPrompt {
     fn handle_event(&mut self, event: Event) -> Result<ExitState> {
         if let Event::Key(k) = event {
             match k.code {
+                // Quit shortcuts
                 KeyCode::Esc => return Ok(ExitState::Quit),
                 KeyCode::Char('c') | KeyCode::Char('C') if k.modifiers == KeyModifiers::CONTROL => {
                     return Ok(ExitState::Quit);
                 }
 
+                // Navigate form fields
                 KeyCode::Tab | KeyCode::Down => self.selected.down(),
                 KeyCode::BackTab | KeyCode::Up => self.selected.up(),
                 KeyCode::Enter if self.selected != SelectedInput::Remember => self.selected.down(),
 
+                // Typing
                 KeyCode::Char(c) if !c.is_control() => match self.selected {
                     SelectedInput::Username => self.username.push(c),
                     SelectedInput::Password => self.password.push(c),
@@ -117,6 +126,7 @@ impl Screen for LoginPrompt {
                     SelectedInput::Remember => self.remember = !self.remember,
                 },
 
+                // Submit
                 KeyCode::Enter => {
                     if self.username.is_empty() {
                         self.message = "Username is empty!";
@@ -129,7 +139,7 @@ impl Screen for LoginPrompt {
                                 creds: (self.username.clone(), self.password.clone().into()),
                                 remember: self.remember,
                             },
-                        )?)));
+                        ))));
                     }
                 }
 

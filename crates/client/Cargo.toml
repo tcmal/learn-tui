@@ -1,5 +1,5 @@
 [package]
-name = "bblearn_api"
+name = "edlearn_client"
 version = "0.1.0"
 edition = "2021"
 

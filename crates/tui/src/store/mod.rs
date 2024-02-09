@@ -1,19 +1,18 @@
-use anyhow::Result;
-use bblearn_api::{
+use camino::Utf8PathBuf;
+use edlearn_client::{
     content::{Content, ContentPayload},
     course::Course,
     terms::Term,
     users::User,
     Client,
 };
-use camino::Utf8PathBuf;
 use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 
 mod downloader;
-use downloader::Downloader;
+pub use downloader::Downloader;
 
 mod worker;
-use worker::Worker;
+pub use worker::Worker;
 
 use crate::{event::EventBus, main_screen::Action};
 
@@ -45,7 +44,7 @@ pub struct Store {
 
 /// Requests sent to the worker thread
 #[derive(Debug)]
-enum Request {
+pub(crate) enum Request {
     Me,
     CourseContent {
         course_idx: CourseIdx,
@@ -64,14 +63,14 @@ enum Request {
 }
 
 #[derive(Debug)]
-enum DownloaderRequest {
+pub(crate) enum DownloaderRequest {
     DoDownload(DownloadRef, DownloadReq),
 }
 
 /// Messages received by the app from the worker or downloader thread
 #[derive(Debug)]
 pub enum Event {
-    Error(bblearn_api::Error),
+    Error(edlearn_client::Error),
     Me(User, Vec<Course>, Vec<Term>),
     CourseContent {
         course_idx: CourseIdx,
@@ -89,11 +88,11 @@ pub enum Event {
 }
 
 impl Store {
-    pub fn new(bus: &EventBus, client: Client) -> Result<Self> {
-        let worker_channel = Worker::spawn_on(bus, client.clone_sharing_state())?;
-        let downloader_channel = Downloader::spawn_on(bus, client)?;
+    pub fn new(bus: &EventBus, client: Client) -> Self {
+        let worker_channel = Worker::spawn_on(bus, client.clone_sharing_state());
+        let downloader_channel = Downloader::spawn_on(bus, client);
 
-        Ok(Self {
+        Self {
             worker_channel,
             downloader_channel,
             me: Default::default(),
@@ -105,7 +104,7 @@ impl Store {
             page_texts: Default::default(),
             download_queue: Default::default(),
             next_download_ref: Default::default(),
-        })
+        }
     }
 
     pub fn my_courses(&self) -> Option<&[Course]> {
@@ -233,7 +232,7 @@ impl Store {
 
     pub fn event(&mut self, e: Event) -> Action {
         match e {
-            Event::Error(bblearn_api::Error::AuthError(_)) => return Action::Reauthenticate,
+            Event::Error(edlearn_client::Error::AuthError(_)) => return Action::Reauthenticate,
             Event::Error(e) => panic!("{}", e), // TODO
             Event::Me(u, cs, mut terms) => {
                 self.me = Some(u);

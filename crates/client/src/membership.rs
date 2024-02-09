@@ -2,12 +2,12 @@ use serde::Deserialize;
 
 use crate::{course::Course, Client, Result};
 
+/// Ties a user to a course
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserMembership {
     pub id: String,
-    #[serde(rename = "userId")]
     pub user_id: String,
-    #[serde(rename = "courseId")]
     pub course_id: String,
     pub course: Course,
 }

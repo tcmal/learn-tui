@@ -1,7 +1,8 @@
 //! Code for authenticating to Edinburgh University's Learn instance
 //!
 //! Thank you to @kilolympus and @chaives for figuring out the login process
-//! See: https://git.tardisproject.uk/kilo/echo360-downloader
+//! See: <https://git.tardisproject.uk/kilo/echo360-downloader>
+
 use regex::Regex;
 use reqwest::blocking::Response;
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,7 @@ use crate::Client;
 /// Information used to login
 pub type Credentials = (String, Password);
 
+/// An error encountered when logging in
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("we didn't login for some reason. check your credentials?")]
@@ -37,13 +39,15 @@ pub enum Error {
 }
 
 impl Client {
-    pub(crate) fn authenticate(&self) -> Result<(), Error> {
+    /// Attempt to authenticate with the set credentials
+    pub fn authenticate(&self) -> Result<(), Error> {
         self.ease_login()?;
         self.learn_login()?;
 
         Ok(())
     }
 
+    /// Logs into Ease / Cosign.
     fn ease_login(&self) -> Result<(), Error> {
         // Get once to set the cookies
         self.http
@@ -72,6 +76,7 @@ impl Client {
         Ok(())
     }
 
+    // Logs into learn by performing the SAML request to the IDP
     fn learn_login(&self) -> Result<(), Error> {
         // Initiates the login process
         const LEARN_LOGIN_URL: &str = "https://www.learn.ed.ac.uk/auth-saml/saml/login?apId=_175_1&redirectUrl=https%3A%2F%2Fwww.learn.ed.ac.uk%2Fultra";

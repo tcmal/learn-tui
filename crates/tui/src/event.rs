@@ -26,14 +26,20 @@ pub enum Event {
     Store(store::Event),
 }
 
-/// The event bus aggregates events from multiple threads, and joins them all back when required.
-/// FIXME: We don't actually use our join handles, we just let the threads get cleaned up since we'll exit right after.
-#[allow(dead_code)]
+/// The event bus aggregates events from multiple threads, and joins all the threads back when required.
 #[derive(Debug)]
 pub struct EventBus {
+    /// A sender to the event bus
+    /// We keep one of these so we can spawn new threads with it as required
     sender: mpsc::Sender<Event>,
+
+    /// Receiver for the event bus
     receiver: mpsc::Receiver<Event>,
+
+    /// Whether threads should keep running. This is used to request exit when needed.
     running: Arc<AtomicBool>,
+
+    /// List of threads running on this event bus
     handles: RefCell<Vec<thread::JoinHandle<()>>>,
 }
 

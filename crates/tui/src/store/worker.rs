@@ -1,5 +1,5 @@
 use anyhow::Result;
-use bblearn_api::Client;
+use edlearn_client::Client;
 use log::debug;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
@@ -15,7 +15,7 @@ pub struct Worker {
 
 impl Worker {
     /// Spawn the store worker on the given event bus, returning a channel to send commands down.
-    pub fn spawn_on(bus: &EventBus, client: Client) -> Result<Sender<Request>> {
+    pub(crate) fn spawn_on(bus: &EventBus, client: Client) -> Sender<Request> {
         let (cmd_send, cmd_recv) = channel();
 
         bus.spawn("store_worker", move |_, event_send| {
@@ -28,7 +28,7 @@ impl Worker {
             .main()
         });
 
-        Ok(cmd_send)
+        cmd_send
     }
 
     fn main(self) {
@@ -46,7 +46,7 @@ impl Worker {
         debug!("shutting down");
     }
 
-    fn process_msg(&self, msg: Request) -> Result<Event, bblearn_api::Error> {
+    fn process_msg(&self, msg: Request) -> Result<Event, edlearn_client::Error> {
         match msg {
             Request::Me => {
                 let me = self.client.me()?;
@@ -65,7 +65,7 @@ impl Worker {
                 course_idx,
                 course_id,
             } => {
-                let content = self.client.content_children(&course_id, "ROOT")?;
+                let content = self.client.course_children(&course_id)?;
                 Ok(Event::CourseContent {
                     course_idx,
                     content,

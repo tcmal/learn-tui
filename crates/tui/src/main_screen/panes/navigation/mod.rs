@@ -1,4 +1,3 @@
-use anyhow::Result;
 use crossterm::event::KeyCode;
 use ratatui::{prelude::Rect, Frame};
 use tui_tree_widget::{Tree, TreeItem, TreeState};
@@ -39,14 +38,14 @@ impl Pane for Navigation {
         );
     }
 
-    fn handle_event(&mut self, store: &mut Store, event: Event) -> Result<Action> {
+    fn handle_event(&mut self, store: &mut Store, event: Event) -> Action {
         let Event::Key(key) = event else {
-            return Ok(Action::None);
+            return Action::None;
         };
 
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => {
-                return Ok(Action::Exit);
+                return Action::Exit;
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 self.tree_state
@@ -80,17 +79,17 @@ impl Pane for Navigation {
 
                     // show in viewer
                     NavTree::ContentLeaf { content_idx } => {
-                        return Ok(Action::Show(Document::Content(*content_idx)));
+                        return Action::Show(Document::Content(*content_idx));
                     }
                     NavTree::Header {
                         ty: HeaderTy::Welcome,
                     } => {
-                        return Ok(Action::Show(Document::Welcome));
+                        return Action::Show(Document::Welcome);
                     }
                     NavTree::Header {
                         ty: HeaderTy::Downloads,
                     } => {
-                        return Ok(Action::Show(Document::Downloads));
+                        return Action::Show(Document::Downloads);
                     }
 
                     // do nothing on loading stuff
@@ -112,13 +111,15 @@ impl Pane for Navigation {
                 } = sel_node
                 {
                     let content = store.content(*content_idx);
-                    open::that(content.browser_link())?;
+                    if let Err(e) = open::that(content.browser_link()) {
+                        todo!("show open error {}", e);
+                    }
                 }
             }
             _ => (),
         };
 
-        Ok(Action::None)
+        Action::None
     }
 }
 

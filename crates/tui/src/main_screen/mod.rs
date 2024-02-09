@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use anyhow::Result;
-use bblearn_api::Client;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use edlearn_client::Client;
 use log::{debug, error};
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Rect},
@@ -14,24 +14,40 @@ use crate::{
     auth_cache::{AuthCache, LoginDetails},
     event::{Event, EventBus},
     login_prompt::LoginPrompt,
-    panes::{Document, Navigation, Pane, Viewer},
     store::Store,
     ExitState, Screen,
 };
 
+pub mod panes;
+use panes::{Document, Navigation};
+
+use self::panes::{Pane, Viewer};
+
+/// An action that a [`Pane`] can request to be taken
 pub enum Action {
-    Exit,
+    /// Do nothing
     None,
+
+    /// Quit the application
+    Exit,
+
+    /// Tell the viewer to show something, and focus the viewer
     Show(Document),
+
+    /// Focus the navigation pane
     FocusNavigation,
+
+    /// Go back to the login screen
     Reauthenticate,
 }
 
-/// Holds application-related state
+/// The main screen of the application
+/// The bulk of the UI logic is handled by the [`self::panes`], this just contains shared state.
 pub struct MainScreen {
     /// Handle to the client we're using, so we can save auth state when we exit
     client: Client,
 
+    /// Underlying data store,
     store: Store,
 
     /// UI Components & State
@@ -44,8 +60,8 @@ pub struct MainScreen {
 }
 
 impl MainScreen {
-    /// Create a new app using the given event bus
-    pub fn new(events: Rc<EventBus>, login_details: LoginDetails) -> Result<Self> {
+    /// Create a new app using the given event bus and login details
+    pub fn new(events: Rc<EventBus>, login_details: LoginDetails) -> Self {
         let client = match AuthCache::load() {
             Ok(c) => c.into_client().unwrap(),
             Err(e) => {
@@ -55,18 +71,18 @@ impl MainScreen {
             }
         };
 
-        Ok(Self {
-            store: Store::new(&events, client.clone_sharing_state())?,
+        Self {
+            store: Store::new(&events, client.clone_sharing_state()),
             events,
             client,
             navigation: Navigation::default(),
             viewer: Viewer::default(),
             viewer_focused: false,
             save_auth_state: login_details.remember,
-        })
+        }
     }
 
-    /// Quit the application
+    /// Quit the application, saving the auth state
     pub fn quit(&mut self) -> Result<ExitState> {
         if self.save_auth_state {
             debug!("saving auth state");
@@ -80,7 +96,6 @@ impl MainScreen {
 }
 
 impl Screen for MainScreen {
-    /// Draw to the given frame
     fn draw(&mut self, frame: &mut Frame) {
         let size = frame.size();
 
@@ -140,12 +155,13 @@ impl Screen for MainScreen {
             return self.quit();
         }
 
+        // Dispatch to pane or store
         let action = match event {
             Event::Store(s) => self.store.event(s),
             x => match self.viewer_focused {
                 true => self.viewer.handle_event(&mut self.store, x),
                 false => self.navigation.handle_event(&mut self.store, x),
-            }?,
+            },
         };
 
         // Perform action if needed

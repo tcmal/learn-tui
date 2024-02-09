@@ -1,5 +1,5 @@
 [package]
-name = "learn_tui"
+name = "edlearn_tui"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,7 +10,7 @@ ratatui = { workspace = true }
 crossterm = "0.27.0"
 tui-tree-widget = "0.16.0"
 xdg = "2.5.2"
-bblearn_api = { path = "../client" }
+edlearn_client = { path = "../client" }
 bbml = { path = "../bbml" }
 anyhow = "1.0.76"
 log = { workspace = true }

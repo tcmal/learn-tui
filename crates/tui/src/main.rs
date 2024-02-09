@@ -1,3 +1,23 @@
+//! This is the main crate, responsible for the TUI application stuff.
+//!
+//! # Architecture
+//! We use [`ratatui`] with something like a multi-threaded [elm model](https://ratatui.rs/concepts/application-patterns/the-elm-architecture/).
+//! First, our application is divided into [`Screen`]s - currently only the [`LoginPrompt`] and the [`MainScreen`].
+//!
+//! [`self::event::EventBus`] provides a multi-producer single-consumer event bus, and holds onto thread handles, etc.
+//! Our [`main_loop`] then consists of:
+//!
+//!   * Drawing the current screen
+//!   * Waiting for an event, and passing it up to the screen
+//!   * So long as the screen doesn't say to change or quit, loop
+//!
+//! Currently at most 3 places can produce events:
+//!
+//!   * [`EventBus::spawn_terminal_listener`], which listens for key events, etc.
+//!   * [`store::Worker`], which performs API requests and sends the results back
+//!   * [`store::Downloader`], which downloads and saves files and sends progress updates
+//!
+//! The latter 2 receive commands from their own channels, and are driven by methods in [`store::Store`].
 use anyhow::Result;
 use event::{Event, EventBus};
 use log::debug;
@@ -11,15 +31,14 @@ use crate::{
     login_prompt::LoginPrompt,
 };
 
-mod auth_cache;
-mod event;
-mod login_prompt;
-mod main_screen;
-mod panes;
-mod store;
-mod tui;
+pub mod auth_cache;
+pub mod event;
+pub mod login_prompt;
+pub mod main_screen;
+pub mod store;
+pub mod tui;
 
-fn main() -> Result<()> {
+pub fn main() -> Result<()> {
     init_logging();
 
     // Initialise terminal
@@ -51,7 +70,7 @@ fn run_in_terminal<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
                 creds: a.creds,
                 remember: true,
             },
-        )?),
+        )),
         Err(_) => Box::new(LoginPrompt::new(bus.clone())),
     };
 
@@ -59,18 +78,22 @@ fn run_in_terminal<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     main_loop(app, bus, terminal)
 }
 
+/// A single screen of the app.
+/// This will be the only thing the main loop asks to draw / handle events, so it will usually dispatch out to other places.
 pub trait Screen {
     fn draw(&mut self, frame: &mut Frame);
     fn handle_event(&mut self, event: Event) -> Result<ExitState>;
 }
 
+/// Whether the current [`Screen`] should exit or change
 pub enum ExitState {
     Running,
     Quit,
     ChangeScreen(Box<dyn Screen>),
 }
 
-fn main_loop<B: Backend>(
+/// Run the given screen using the given terminal.
+pub fn main_loop<B: Backend>(
     mut app: Box<dyn Screen>,
     bus: Rc<EventBus>,
     terminal: &mut Terminal<B>,

@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
-use bblearn_api::Client;
 use camino::Utf8PathBuf;
+use edlearn_client::Client;
 use log::debug;
 use std::{
     fs::File,
@@ -35,7 +35,7 @@ pub struct Downloader {
 
 impl Downloader {
     /// Spawn the store worker on the given event bus, returning a channel to send commands down.
-    pub fn spawn_on(bus: &EventBus, client: Client) -> Result<Sender<DownloaderRequest>> {
+    pub(crate) fn spawn_on(bus: &EventBus, client: Client) -> Sender<DownloaderRequest> {
         let (cmd_send, cmd_recv) = channel();
 
         bus.spawn("downloader", move |_, event_send| {
@@ -48,7 +48,7 @@ impl Downloader {
             .main()
         });
 
-        Ok(cmd_send)
+        cmd_send
     }
 
     fn main(self) {

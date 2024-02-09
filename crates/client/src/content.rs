@@ -7,6 +7,12 @@ use std::fmt;
 use crate::{Client, Error, Result, LEARN_BASE};
 
 impl Client {
+    /// Get the top-level children of a course
+    pub fn course_children(&self, course_id: &str) -> Result<Vec<Content>> {
+        self.content_children(course_id, "ROOT")
+    }
+
+    /// Get the children of a given content item.
     pub fn content_children(&self, course_id: &str, content_id: &str) -> Result<Vec<Content>> {
         Ok(self
             .get::<ContentChildrenResp>(&format!(
@@ -19,6 +25,7 @@ impl Client {
             .collect())
     }
 
+    /// Get the text of a page
     pub fn page_text(&self, course_id: &str, content_id: &str) -> Result<String> {
         let mut results = self
             .get::<ContentChildrenResp>(&format!(
@@ -116,7 +123,7 @@ pub enum ContentPayload {
     /// A folder, with more content inside.
     Folder,
 
-    /// A page. Use [`Self::page_contents`] to get the actual text.
+    /// A page. Use [`Client::page_text`] to get the actual text.
     Page,
 
     /// Something else.
