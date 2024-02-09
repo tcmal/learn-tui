@@ -77,6 +77,16 @@ impl Client {
         })
     }
 
+    /// Clone the current client, returning a new one.
+    /// The two clients will share the same authentication state.
+    pub fn clone_sharing_state(&self) -> Self {
+        Self {
+            creds: self.creds.clone(),
+            http: self.http.clone(),
+            cookies: self.cookies.clone(),
+        }
+    }
+
     /// Wrapper for attempting a request, and re-trying if it fails for authentication reasons
     pub fn with_reattempt_auth<T, F>(&self, mut f: F) -> Result<T, Error>
     where
@@ -84,7 +94,7 @@ impl Client {
     {
         match f() {
             Err(Error::HTTPError(e)) => {
-                if let Some(_) = e.status().filter(|c| c.as_u16() / 100 == 4) {
+                if e.status().filter(|c| c.as_u16() / 100 == 4).is_some() {
                     self.authenticate()?;
                     f()
                 } else {
@@ -97,7 +107,7 @@ impl Client {
 
     pub(crate) fn get<T: for<'a> Deserialize<'a>>(&self, url: &str) -> Result<T, Error> {
         self.with_reattempt_auth(|| {
-            let resp = self.http.get(&format!("{}{}", LEARN_BASE, url)).send()?;
+            let resp = self.http.get(format!("{}{}", LEARN_BASE, url)).send()?;
             if log::log_enabled!(log::Level::Debug) {
                 let s = resp.text()?;
                 debug!("response: {}", s);
@@ -113,7 +123,7 @@ impl Client {
         self.with_reattempt_auth(|| {
             Ok(self
                 .http
-                .get(&format!("{}institution/api/health", LEARN_BASE))
+                .get(format!("{}institution/api/health", LEARN_BASE))
                 .send()?
                 .json()?)
         })

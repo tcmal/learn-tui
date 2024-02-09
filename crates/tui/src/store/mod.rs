@@ -4,13 +4,14 @@ use bblearn_api::{
     course::Course,
     terms::Term,
     users::User,
+    Client,
 };
 use std::{collections::HashMap, ops::Range, sync::mpsc::Sender};
 
 mod worker;
-pub use worker::StoreWorker;
+use worker::Worker;
 
-use crate::{auth_cache::LoginDetails, event::EventBus, main_screen::Action};
+use crate::{event::EventBus, main_screen::Action};
 
 pub type TermIdx = usize;
 pub type CourseIdx = usize;
@@ -28,12 +29,12 @@ pub struct Store {
 
     page_texts: HashMap<ContentIdx, String>,
 
-    worker_channel: Sender<LoadRequest>,
+    worker_channel: Sender<Request>,
 }
 
 /// Requests sent to the worker thread
 #[derive(Debug)]
-pub enum LoadRequest {
+enum Request {
     Me,
     CourseContent {
         course_idx: CourseIdx,
@@ -71,8 +72,8 @@ pub enum Event {
 }
 
 impl Store {
-    pub fn new(bus: &EventBus, login_details: LoginDetails) -> Result<Self> {
-        let worker_channel = StoreWorker::spawn_on(bus, login_details)?;
+    pub fn new(bus: &EventBus, client: Client) -> Result<Self> {
+        let worker_channel = Worker::spawn_on(bus, client)?;
 
         Ok(Self {
             worker_channel,
@@ -99,7 +100,7 @@ impl Store {
     }
 
     pub fn request_my_courses(&self) {
-        self.worker_channel.send(LoadRequest::Me).unwrap()
+        self.worker_channel.send(Request::Me).unwrap()
     }
 
     pub fn course_content(&self, course_idx: CourseIdx) -> Option<Range<ContentIdx>> {
@@ -108,7 +109,7 @@ impl Store {
 
     pub fn request_course_content(&self, course_idx: CourseIdx) {
         self.worker_channel
-            .send(LoadRequest::CourseContent {
+            .send(Request::CourseContent {
                 course_idx,
                 course_id: self.my_courses().unwrap()[course_idx].id.clone(),
             })
@@ -130,7 +131,7 @@ impl Store {
         }
 
         self.worker_channel
-            .send(LoadRequest::ContentChildren {
+            .send(Request::ContentChildren {
                 content_idx,
                 course_id: content.course_id.clone(),
                 content_id: content.id.clone(),
@@ -153,7 +154,7 @@ impl Store {
         }
 
         self.worker_channel
-            .send(LoadRequest::PageText {
+            .send(Request::PageText {
                 content_idx,
                 course_id: content.course_id.clone(),
                 content_id: content.id.clone(),
@@ -168,9 +169,9 @@ impl Store {
         &self.my_courses().unwrap()[course_idx]
     }
 
-    pub fn event(&mut self, e: Event) -> Option<Action> {
+    pub fn event(&mut self, e: Event) -> Action {
         match e {
-            Event::Error(bblearn_api::Error::AuthError(_)) => return Some(Action::Reauthenticate),
+            Event::Error(bblearn_api::Error::AuthError(_)) => return Action::Reauthenticate,
             Event::Error(e) => panic!("{}", e), // TODO
             Event::Me(u, cs, mut terms) => {
                 self.me = Some(u);
@@ -216,6 +217,6 @@ impl Store {
             }
         };
 
-        None
+        Action::None
     }
 }

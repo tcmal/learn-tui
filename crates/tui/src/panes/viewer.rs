@@ -11,6 +11,7 @@ use ratatui::{
 
 use crate::{
     event::Event,
+    main_screen::AppState,
     store::{ContentIdx, Store},
 };
 
@@ -39,13 +40,13 @@ impl Viewer {
 }
 
 impl Pane for Viewer {
-    fn draw(&mut self, store: &Store, frame: &mut Frame, area: Rect) {
+    fn draw(&mut self, state: &AppState, frame: &mut Frame, area: Rect) {
         let rendered = self
             .cached_render
             .clone()
             .unwrap_or_else(|| match self.show {
                 Document::Content(idx) => {
-                    if let Some(p) = self.render_content(store, idx) {
+                    if let Some(p) = self.render_content(&state.store, idx) {
                         self.cached_render = Some(p.clone());
                         p
                     } else {
@@ -110,7 +111,7 @@ impl Pane for Viewer {
         frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
     }
 
-    fn handle_event(&mut self, store: &Store, event: Event) -> Result<Action> {
+    fn handle_event(&mut self, state: &AppState, event: Event) -> Result<Action> {
         let Event::Key(key) = event else {
             return Ok(Action::None);
         };
@@ -137,7 +138,7 @@ impl Pane for Viewer {
 
             KeyCode::Char('b') => {
                 if let Document::Content(content_idx) = self.show {
-                    let content = store.content(content_idx);
+                    let content = state.store.content(content_idx);
                     open::that(content.browser_link())?;
                 };
             }

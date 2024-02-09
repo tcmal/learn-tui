@@ -3,40 +3,27 @@ use bblearn_api::Client;
 use log::debug;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use super::{Event, LoadRequest};
-use crate::{
-    auth_cache::{AuthCache, LoginDetails},
-    event::{Event as CrateEvent, EventBus},
-};
+use super::{Event, Request};
+use crate::event::{Event as CrateEvent, EventBus};
 
 /// Performs requests it receives from the main thread, and sends the results back.
-pub struct StoreWorker {
+pub struct Worker {
     client: Client,
-    msg_recv: Receiver<LoadRequest>,
+    msg_recv: Receiver<Request>,
     event_send: Sender<CrateEvent>,
-    save_auth: bool,
 }
 
-impl StoreWorker {
+impl Worker {
     /// Spawn the store worker on the given event bus, returning a channel to send commands down.
-    pub fn spawn_on(bus: &EventBus, login_details: LoginDetails) -> Result<Sender<LoadRequest>> {
-        let client = match AuthCache::load() {
-            Ok(c) => c.into_client().unwrap(),
-            Err(e) => {
-                debug!("error loading config: {:?}", e);
-
-                Client::new(login_details.creds)
-            }
-        };
+    pub fn spawn_on(bus: &EventBus, client: Client) -> Result<Sender<Request>> {
         let (cmd_send, cmd_recv) = channel();
 
         bus.spawn("store_worker", move |_, event_send| {
             // we don't need running because the receiver will raise an error and we'll exit
-            StoreWorker {
+            Worker {
                 client,
                 msg_recv: cmd_recv,
                 event_send,
-                save_auth: login_details.remember,
             }
             .main()
         });
@@ -57,15 +44,11 @@ impl StoreWorker {
         }
 
         debug!("shutting down");
-        if self.save_auth {
-            let res = AuthCache::from_client(&self.client).save();
-            debug!("saving config: {:?}", res);
-        }
     }
 
-    fn process_msg(&self, msg: LoadRequest) -> Result<Event, bblearn_api::Error> {
+    fn process_msg(&self, msg: Request) -> Result<Event, bblearn_api::Error> {
         match msg {
-            LoadRequest::Me => {
+            Request::Me => {
                 let me = self.client.me()?;
                 let courses = self
                     .client
@@ -78,7 +61,7 @@ impl StoreWorker {
 
                 Ok(Event::Me(me, courses, terms))
             }
-            LoadRequest::CourseContent {
+            Request::CourseContent {
                 course_idx,
                 course_id,
             } => {
@@ -88,7 +71,7 @@ impl StoreWorker {
                     content,
                 })
             }
-            LoadRequest::ContentChildren {
+            Request::ContentChildren {
                 content_idx,
                 course_id,
                 content_id,
@@ -99,7 +82,7 @@ impl StoreWorker {
                     children,
                 })
             }
-            LoadRequest::PageText {
+            Request::PageText {
                 content_idx,
                 course_id,
                 content_id,

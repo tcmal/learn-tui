@@ -48,7 +48,7 @@ impl Client {
         self.http
             .get("https://www.ease.ed.ac.uk/")
             .send()
-            .map_err(|e| Error::EaseReqError(e))?;
+            .map_err(Error::EaseReqError)?;
 
         // Login to CoSign
         let text = self
@@ -60,7 +60,7 @@ impl Client {
             ])
             .send()
             .and_then(|r| r.text())
-            .map_err(|e| Error::EaseReqError(e))?;
+            .map_err(Error::EaseReqError)?;
 
         if !text.contains("/logout/logout.cgi") {
             return Err(Error::LoginFailed);
@@ -80,7 +80,7 @@ impl Client {
             .get(LEARN_LOGIN_URL)
             .send()
             .and_then(|r| r.text())
-            .map_err(|e| Error::LearnReqError(e))?;
+            .map_err(Error::LearnReqError)?;
 
         let samlreq_re = Regex::new(r#"name="SAMLRequest" value="([^"]*)""#).unwrap();
         let Some(caps) = samlreq_re.captures(&text) else {
@@ -95,7 +95,7 @@ impl Client {
             .form(&[("SAMLRequest", samlreq)])
             .send()
             .and_then(|t| t.text())
-            .map_err(|e| Error::IDPReqError(e))?;
+            .map_err(Error::IDPReqError)?;
         let samlresp_re = Regex::new(r#"name="SAMLResponse" value="([^"]*)""#).unwrap();
         let Some(caps) = samlresp_re.captures(&text) else {
             return Err(Error::NoSAMLResponse(text));
@@ -106,7 +106,7 @@ impl Client {
             .post(LEARN_CALLBACK_URL)
             .form(&[("SAMLResponse", samlresp)])
             .send()
-            .map_err(|e| Error::LearnReqError(e))?;
+            .map_err(Error::LearnReqError)?;
 
         Ok(())
     }
