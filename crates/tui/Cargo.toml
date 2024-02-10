@@ -12,16 +12,16 @@ license = "GPL-3.0-only"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ratatui = { workspace = true }
-crossterm = "0.27.0"
-tui-tree-widget = "0.16.0"
-xdg = "2.5.2"
-edlearn_client = { path = "../client" }
-bbml = { path = "../bbml" }
 anyhow = "1.0.76"
+bbml = { version = "0.0.1", path = "../bbml" }
+camino = "1.1.6"
+crossterm = "0.27.0"
+edlearn_client = { version = "0.0.1", path = "../client" }
 log = { workspace = true }
-simplelog = "0.12.1"
+open = "5.0.1"
+ratatui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-open = "5.0.1"
-camino = "1.1.6"
+simplelog = "0.12.1"
+tui-tree-widget = "0.16.0"
+xdg = "2.5.2"
