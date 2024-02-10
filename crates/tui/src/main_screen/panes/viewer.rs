@@ -330,6 +330,14 @@ fn welcome_message() -> Paragraph<'static> {
         ]
         .into(),
         vec![
+            "Links have ".into(),
+            "blue".blue(),
+            "text and a number after them. Hit ".into(),
+            "f".blue(),
+            " then type the number to open them.".into(),
+        ]
+        .into(),
+        vec![
             "At any point, use ".into(),
             "b".blue(),
             " to try to open the selected item in your browser.\n".into(),
