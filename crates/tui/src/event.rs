@@ -43,6 +43,12 @@ pub struct EventBus {
     handles: RefCell<Vec<thread::JoinHandle<()>>>,
 }
 
+impl Default for EventBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventBus {
     /// Create a new event bus
     pub fn new() -> Self {

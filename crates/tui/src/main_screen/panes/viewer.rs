@@ -69,7 +69,7 @@ impl Viewer {
 
         match self.show {
             Document::Content(idx) => {
-                if let Some(p) = self.render_content(&store, idx) {
+                if let Some(p) = self.render_content(store, idx) {
                     // Cache rendered content
                     self.cached_render = Some(p.clone());
                     p
@@ -169,7 +169,7 @@ impl Viewer {
 
     fn open_referenced_link(&mut self) -> Action {
         let Some(href) = self.displayed_links.get(self.link_entry_acc) else {
-            return Action::Flash(error_text(format!("No link found")));
+            return Action::Flash(error_text("No link found".to_string()));
         };
 
         if let Err(e) = open::that(href) {
@@ -255,6 +255,7 @@ impl Pane for Viewer {
             KeyCode::Char('d') => {
                 if let Document::Content(content_idx) = self.show {
                     store.download_content(content_idx);
+                    return Action::Flash("Queued for download".into());
                 };
             }
 
@@ -265,7 +266,9 @@ impl Pane for Viewer {
                     self.link_entry_digits = Some(0);
 
                     return Action::Flash(
-                        format!("Go to... (type the number after the link)").into(),
+                        "Go to... (type the number after the link)"
+                            .to_string()
+                            .into(),
                     );
                 }
             }
@@ -273,8 +276,8 @@ impl Pane for Viewer {
                 return self.open_referenced_link();
             }
 
-            KeyCode::Char(n) if n.is_digit(10) => match self.link_entry_digits.as_mut() {
-                Some(idx) => {
+            KeyCode::Char(n) if n.is_ascii_digit() => {
+                if let Some(idx) = self.link_entry_digits.as_mut() {
                     // add new digit to end of number
                     self.link_entry_acc *= 10;
                     self.link_entry_acc += n.to_digit(10).unwrap() as usize;
@@ -297,8 +300,7 @@ impl Pane for Viewer {
                         );
                     }
                 }
-                None => (),
-            },
+            }
 
             _ => (),
         };
@@ -318,7 +320,7 @@ fn welcome_message() -> Paragraph<'static> {
             "j/k or ↓/↑".blue(),
             " to navigate up and down, then ".into(),
             "Enter".blue(),
-            " to select an item.\n".into(),
+            " to select an item.".into(),
         ]
         .into(),
         vec![
@@ -332,7 +334,7 @@ fn welcome_message() -> Paragraph<'static> {
         vec![
             "Links have ".into(),
             "blue".blue(),
-            "text and a number after them. Hit ".into(),
+            " text and a number after them. Hit ".into(),
             "f".blue(),
             " then type the number to open them.".into(),
         ]
@@ -340,7 +342,9 @@ fn welcome_message() -> Paragraph<'static> {
         vec![
             "At any point, use ".into(),
             "b".blue(),
-            " to try to open the selected item in your browser.\n".into(),
+            " to try to open the selected item in your browser, or ".into(),
+            "d".blue(),
+            " to try to download it.".into(),
         ]
         .into(),
         vec!["Use ".into(), "Ctrl-C".blue(), " to quit.".into()].into(),

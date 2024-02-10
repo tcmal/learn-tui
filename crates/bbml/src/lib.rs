@@ -129,7 +129,6 @@ impl<'a> RenderState<'a> {
                             if suboutp.empty_or_whitespace() {
                                 continue;
                             }
-                            drop(suboutp);
 
                             match child_node {
                                 // Sublists don't use <li>s
@@ -251,7 +250,7 @@ impl<'a> RenderOutput<'a> {
     {
         RenderOutput {
             text: subtext,
-            links: &mut self.links,
+            links: self.links,
         }
     }
 }

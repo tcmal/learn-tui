@@ -19,12 +19,12 @@ pub struct Navigation {
 
 impl Pane for Navigation {
     fn draw(&mut self, store: &Store, frame: &mut Frame, area: Rect) {
-        if self.refresh_tree(&store) || self.cached_view_tree.is_none() {
+        if self.refresh_tree(store) || self.cached_view_tree.is_none() {
             // changed, so refresh view tree
             self.cached_view_tree = Some(
                 self.nav_tree
                     .iter()
-                    .map(|i| i.as_treeitem(&store))
+                    .map(|i| i.as_treeitem(store))
                     .collect(),
             );
         }
