@@ -36,6 +36,7 @@ pub mod event;
 pub mod login_prompt;
 pub mod main_screen;
 pub mod store;
+pub mod styles;
 pub mod tui;
 
 pub fn main() -> Result<()> {

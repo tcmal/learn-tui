@@ -3,7 +3,7 @@ use ratatui::{prelude::Rect, Frame};
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use super::{Action, Document, Pane};
-use crate::{event::Event, store::Store};
+use crate::{event::Event, store::Store, styles::error_text};
 
 mod tree;
 use tree::*;
@@ -112,7 +112,7 @@ impl Pane for Navigation {
                 {
                     let content = store.content(*content_idx);
                     if let Err(e) = open::that(content.browser_link()) {
-                        todo!("show open error {}", e);
+                        return Action::Flash(error_text(format!("Error opening in browser: {e}")));
                     }
                 }
             }

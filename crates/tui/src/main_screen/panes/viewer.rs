@@ -12,6 +12,7 @@ use ratatui::{
 use crate::{
     event::Event,
     store::{ContentIdx, DownloadState, Store},
+    styles::error_text,
 };
 
 use super::{Action, Pane};
@@ -57,7 +58,7 @@ impl Viewer {
         self.show = d;
         self.y_offset = 0;
         self.cached_render = None;
-        self.displayed_links = vec![];
+        self.set_displayed_links(vec![]);
     }
 
     /// Render the current document, updating the render cache if necessary
@@ -157,11 +158,28 @@ impl Viewer {
             0
         };
         self.displayed_links = links;
+        self.link_entry_acc = 0;
+        self.link_entry_digits = None;
         debug!(
             "displaying {} links (max digits = {})",
             self.displayed_links.len(),
             self.link_idx_max_digits
         );
+    }
+
+    fn open_referenced_link(&mut self) -> Action {
+        let Some(href) = self.displayed_links.get(self.link_entry_acc) else {
+            return Action::Flash(error_text(format!("No link found")));
+        };
+
+        if let Err(e) = open::that(href) {
+            return Action::Flash(error_text(format!("Error opening in browser: {e}")));
+        }
+
+        self.link_entry_acc = 0;
+        self.link_entry_digits = None;
+
+        Action::Flash(format!("Opened {href} in browser").into())
     }
 }
 
@@ -199,7 +217,10 @@ impl Pane for Viewer {
 
         match key.code {
             // Exit
-            KeyCode::Char('q') | KeyCode::Esc => return Action::FocusNavigation,
+            KeyCode::Char('q') | KeyCode::Esc => {
+                self.link_entry_digits = None;
+                return Action::FocusNavigation;
+            }
 
             // Basic vim-like navigation
             KeyCode::Char('g') => self.y_offset = 0,
@@ -221,10 +242,11 @@ impl Pane for Viewer {
 
             // Open in browser
             KeyCode::Char('b') => {
+                self.link_entry_digits = None;
                 if let Document::Content(content_idx) = self.show {
                     let content = store.content(content_idx);
                     if let Err(e) = open::that(content.browser_link()) {
-                        todo!("deal with open error {}", e);
+                        return Action::Flash(error_text(format!("Error opening in browser: {e}")));
                     }
                 };
             }
@@ -241,8 +263,16 @@ impl Pane for Viewer {
                 if self.link_idx_max_digits > 0 {
                     self.link_entry_acc = 0;
                     self.link_entry_digits = Some(0);
+
+                    return Action::Flash(
+                        format!("Go to... (type the number after the link)").into(),
+                    );
                 }
             }
+            KeyCode::Enter if self.link_entry_digits.is_some() => {
+                return self.open_referenced_link();
+            }
+
             KeyCode::Char(n) if n.is_digit(10) => match self.link_entry_digits.as_mut() {
                 Some(idx) => {
                     // add new digit to end of number
@@ -256,17 +286,15 @@ impl Pane for Viewer {
                         self.link_idx_max_digits, self.link_entry_acc
                     );
                     if *idx == self.link_idx_max_digits {
-                        let Some(href) = self.displayed_links.get(self.link_entry_acc) else {
-                            debug!("invalid idx");
-                            return Action::None; // TODO: show this somehow
-                        };
-
-                        if let Err(_) = open::that(href) {
-                            todo!("deal with open error");
-                        }
-
-                        self.link_entry_acc = 0;
-                        self.link_entry_digits = None;
+                        return self.open_referenced_link();
+                    } else {
+                        return Action::Flash(
+                            format!(
+                                "Go to... {} (RET to open, or keep typing numbers)",
+                                self.link_entry_acc
+                            )
+                            .into(),
+                        );
                     }
                 }
                 None => (),
@@ -274,6 +302,9 @@ impl Pane for Viewer {
 
             _ => (),
         };
+
+        // Every branch where we do more digit entry returns, so if we've stopped doing that then exit that mode
+        self.link_entry_digits = None;
 
         Action::None
     }

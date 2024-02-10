@@ -6,7 +6,8 @@ use edlearn_client::Client;
 use log::{debug, error};
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Rect},
-    widgets::{Block, Borders},
+    text::Text,
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -39,6 +40,9 @@ pub enum Action {
 
     /// Go back to the login screen
     Reauthenticate,
+
+    /// Display the given string at the bottom of the screen
+    Flash(Text<'static>),
 }
 
 /// The main screen of the application
@@ -55,6 +59,8 @@ pub struct MainScreen {
     viewer: Viewer,
     viewer_focused: bool,
     save_auth_state: bool,
+
+    flash: Text<'static>,
 
     events: Rc<EventBus>,
 }
@@ -79,6 +85,7 @@ impl MainScreen {
             viewer: Viewer::default(),
             viewer_focused: false,
             save_auth_state: login_details.remember,
+            flash: Text::raw(""),
         }
     }
 
@@ -139,6 +146,17 @@ impl Screen for MainScreen {
         };
 
         frame.render_widget(Block::default().borders(Borders::ALL), focus_rect);
+
+        let bottom_bar = Paragraph::new(self.flash.clone());
+        frame.render_widget(
+            bottom_bar,
+            Rect {
+                x: layout[2].x + 1,
+                y: size.height.saturating_sub(1),
+                width: layout[2].width.saturating_sub(1),
+                height: 1,
+            },
+        )
     }
 
     /// Handle the given event
@@ -164,6 +182,8 @@ impl Screen for MainScreen {
             },
         };
 
+        self.flash = Text::raw("");
+
         // Perform action if needed
         match action {
             Action::None => (),
@@ -182,6 +202,9 @@ impl Screen for MainScreen {
                         "Authentication failed, please double check your username & password.",
                     ),
                 )));
+            }
+            Action::Flash(s) => {
+                self.flash = s;
             }
         };
 
