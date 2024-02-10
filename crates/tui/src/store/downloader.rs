@@ -79,6 +79,12 @@ impl Downloader {
 
     fn do_download(&self, r: ContentIdx, req: DownloadReq) -> Result<(), anyhow::Error> {
         debug!("downloading {req:?} (ref = {r})");
+        self.event_send
+            .send(CrateEvent::Store(Event::DownloadState(
+                r,
+                DownloadState::InProgress(0.0),
+            )))
+            .unwrap();
 
         // make the file
         let mut f = File::create(req.dest.as_std_path())?;
