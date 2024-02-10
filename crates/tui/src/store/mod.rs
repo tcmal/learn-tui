@@ -14,7 +14,7 @@ pub use downloader::Downloader;
 mod worker;
 pub use worker::Worker;
 
-use crate::{event::EventBus, main_screen::Action};
+use crate::{event::EventBus, main_screen::Action, styles::error_text};
 
 pub use self::downloader::{DownloadReq, DownloadState};
 
@@ -233,7 +233,7 @@ impl Store {
     pub fn event(&mut self, e: Event) -> Action {
         match e {
             Event::Error(edlearn_client::Error::AuthError(_)) => return Action::Reauthenticate,
-            Event::Error(e) => panic!("{}", e), // TODO
+            Event::Error(e) => return Action::Flash(error_text(e.to_string())),
             Event::Me(u, cs, mut terms) => {
                 self.me = Some(u);
 
