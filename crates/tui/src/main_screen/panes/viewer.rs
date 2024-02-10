@@ -68,16 +68,7 @@ impl Viewer {
         }
 
         match self.show {
-            Document::Content(idx) => {
-                if let Some(p) = self.render_content(store, idx) {
-                    // Cache rendered content
-                    self.cached_render = Some(p.clone());
-                    p
-                } else {
-                    // Don't cache loading screen, so we re-render once it loads
-                    Paragraph::new("Loading...")
-                }
-            }
+            Document::Content(idx) => self.render_content(store, idx),
             Document::Welcome => {
                 // Static welcome message
                 let p = welcome_message();
@@ -111,43 +102,71 @@ impl Viewer {
     }
 
     /// Render the referenced content item, if it is loaded
-    fn render_content(
-        &mut self,
-        store: &Store,
-        content_idx: ContentIdx,
-    ) -> Option<Paragraph<'static>> {
+    fn render_content(&mut self, store: &Store, content_idx: ContentIdx) -> Paragraph<'static> {
         let content = store.content(content_idx);
         match &content.payload {
             ContentPayload::Page => {
                 let Some(text) = store.page_text(content_idx) else {
                     store.request_page_text(content_idx);
-                    return None;
+                    return Paragraph::new("Loading...");
                 };
                 let (text, links) = bbml::render(text);
                 self.set_displayed_links(links);
-                Some(text)
+                self.cached_render = Some(text);
+                self.cached_render.clone().unwrap()
             }
-            ContentPayload::Link(l) => Some(Paragraph::new(format!("Link to {}. Open with b", l))),
-            ContentPayload::Folder => Some(Paragraph::new("Folder")),
+            ContentPayload::Link(l) => {
+                self.cached_render = Some(Paragraph::new(format!("Link to {}. Open with b", l)));
+                self.cached_render.clone().unwrap()
+            }
+            ContentPayload::Folder => {
+                self.cached_render = Some(Paragraph::new("Folder"));
+                self.cached_render.clone().unwrap()
+            }
             ContentPayload::File {
                 file_name,
                 mime_type,
                 ..
-            } => Some(Paragraph::new(vec![
-                Line::styled(
-                    file_name.clone(),
-                    Style::new().fg(Color::Blue).add_modifier(Modifier::BOLD),
-                ),
-                Line::raw(mime_type.clone()),
-                Line::raw("Open with b"),
-            ])),
-            ContentPayload::Other => Some(Paragraph::new(vec![
-                Line::styled(
-                    "Unknown content type.",
-                    Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
-                Line::raw("File an issue, and in the meantime open in your browser with b."),
-            ])),
+            } => {
+                let mut ls = vec![
+                    Line::styled(
+                        file_name.clone(),
+                        Style::new().fg(Color::Blue).add_modifier(Modifier::BOLD),
+                    ),
+                    Line::raw(mime_type.clone()),
+                    Line::raw("Open with b"),
+                ];
+                if let Some((req, state)) = store.download_status(content_idx) {
+                    match state {
+                        DownloadState::Queued => ls.push(Line::styled(
+                            "Queued for download",
+                            Style::new().fg(Color::Gray),
+                        )),
+                        DownloadState::InProgress(p) => ls.push(Line::styled(
+                            format!("Downloading - {:.2}%", p * 100.0),
+                            Style::new().fg(Color::Blue),
+                        )),
+                        DownloadState::Completed => ls.push(Line::styled(
+                            format!("Downloaded to {}. Press o to open.", req.dest),
+                            Style::new().fg(Color::Green),
+                        )),
+                        DownloadState::Errored(e) => ls.extend(error_text(e.to_string()).lines),
+                    }
+                } else {
+                    self.cached_render = Some(Paragraph::new(ls.clone()));
+                }
+                Paragraph::new(ls)
+            }
+            ContentPayload::Other => {
+                self.cached_render = Some(Paragraph::new(vec![
+                    Line::styled(
+                        "Unknown content type.",
+                        Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    ),
+                    Line::raw("File an issue, and in the meantime open in your browser with b."),
+                ]));
+                self.cached_render.clone().unwrap()
+            }
         }
     }
 
@@ -240,7 +259,7 @@ impl Pane for Viewer {
                 self.y_offset += self.jump_y_offset
             }
 
-            // Open in browser
+            // Open in browser / open downloaded file
             KeyCode::Char('b') => {
                 self.link_entry_digits = None;
                 if let Document::Content(content_idx) = self.show {
@@ -250,11 +269,24 @@ impl Pane for Viewer {
                     }
                 };
             }
+            KeyCode::Char('o') => {
+                self.link_entry_digits = None;
+                if let Document::Content(content_idx) = self.show {
+                    if let Some((req, DownloadState::Completed)) =
+                        store.download_status(content_idx)
+                    {
+                        if let Err(e) = open::that(&req.dest) {
+                            return Action::Flash(error_text(format!("Error opening file: {e}")));
+                        }
+                    }
+                };
+            }
 
             // Queue download
             KeyCode::Char('d') => {
                 if let Document::Content(content_idx) = self.show {
                     store.download_content(content_idx);
+                    self.cached_render = None;
                     return Action::Flash("Queued for download".into());
                 };
             }

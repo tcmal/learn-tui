@@ -21,7 +21,6 @@ pub use self::downloader::{DownloadReq, DownloadState};
 pub type TermIdx = usize;
 pub type CourseIdx = usize;
 pub type ContentIdx = usize;
-pub type DownloadRef = usize;
 
 /// Global data store
 pub struct Store {
@@ -35,8 +34,7 @@ pub struct Store {
 
     page_texts: HashMap<ContentIdx, String>,
 
-    download_queue: HashMap<DownloadRef, (DownloadReq, DownloadState)>,
-    next_download_ref: DownloadRef,
+    download_queue: HashMap<ContentIdx, (DownloadReq, DownloadState)>,
 
     worker_channel: Sender<Request>,
     downloader_channel: Sender<DownloaderRequest>,
@@ -64,7 +62,7 @@ pub(crate) enum Request {
 
 #[derive(Debug)]
 pub(crate) enum DownloaderRequest {
-    DoDownload(DownloadRef, DownloadReq),
+    DoDownload(ContentIdx, DownloadReq),
 }
 
 /// Messages received by the app from the worker or downloader thread
@@ -84,7 +82,7 @@ pub enum Event {
         content_idx: ContentIdx,
         text: String,
     },
-    DownloadState(DownloadRef, DownloadState),
+    DownloadState(ContentIdx, DownloadState),
 }
 
 impl Store {
@@ -103,7 +101,6 @@ impl Store {
             contents: Default::default(),
             page_texts: Default::default(),
             download_queue: Default::default(),
-            next_download_ref: Default::default(),
         }
     }
 
@@ -204,12 +201,10 @@ impl Store {
                 orig_filename: file_name.to_string(),
                 dest,
             };
-            let r = self.next_download_ref;
-            self.next_download_ref += 1;
             self.download_queue
-                .insert(r, (req.clone(), DownloadState::Queued));
+                .insert(content_idx, (req.clone(), DownloadState::Queued));
             self.downloader_channel
-                .send(DownloaderRequest::DoDownload(r, req))
+                .send(DownloaderRequest::DoDownload(content_idx, req))
                 .unwrap();
         }
     }
@@ -228,6 +223,13 @@ impl Store {
 
     pub fn download_queue(&self) -> impl Iterator<Item = &(DownloadReq, DownloadState)> {
         self.download_queue.values()
+    }
+
+    pub fn download_status(
+        &self,
+        content_idx: ContentIdx,
+    ) -> Option<&(DownloadReq, DownloadState)> {
+        self.download_queue.get(&content_idx)
     }
 
     pub fn event(&mut self, e: Event) -> Action {

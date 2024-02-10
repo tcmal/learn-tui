@@ -8,7 +8,7 @@ use std::{
     sync::mpsc::{channel, Receiver, Sender},
 };
 
-use super::{DownloadRef, DownloaderRequest, Event};
+use super::{ContentIdx, DownloaderRequest, Event};
 use crate::event::{Event as CrateEvent, EventBus};
 
 #[derive(Debug, Clone)]
@@ -77,7 +77,7 @@ impl Downloader {
         debug!("shutting down");
     }
 
-    fn do_download(&self, r: DownloadRef, req: DownloadReq) -> Result<(), anyhow::Error> {
+    fn do_download(&self, r: ContentIdx, req: DownloadReq) -> Result<(), anyhow::Error> {
         debug!("downloading {req:?} (ref = {r})");
 
         // make the file
@@ -108,7 +108,7 @@ impl Downloader {
 struct ProgressWriter<'a> {
     dest: &'a mut File,
     channel: &'a Sender<CrateEvent>,
-    r: DownloadRef,
+    r: ContentIdx,
     downloaded: u64,
     size: u64,
     last_sent: f32,
