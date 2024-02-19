@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{remove_file, File};
 
 use anyhow::{anyhow, Context, Result};
 use edlearn_client::{AuthState, Client, Credentials};
@@ -27,6 +27,17 @@ impl AuthCache {
     /// Get a client using this state
     pub fn into_client(self) -> Result<Client> {
         Ok(Client::with_auth_state(self.creds, self.auth_state).unwrap())
+    }
+
+    /// Clear the authentication cache, if it exists
+    pub fn clear() -> Result<()> {
+        let Some(path) = BaseDirectories::with_prefix(PREFIX)?.find_config_file(FILE_NAME) else {
+            return Ok(()); // already cleared
+        };
+
+        remove_file(path)?;
+
+        Ok(())
     }
 
     /// Attempt to load state from the XDG config path
