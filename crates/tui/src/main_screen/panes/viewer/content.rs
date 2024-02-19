@@ -152,7 +152,10 @@ impl Pane for ContentViewer {
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
     ) {
-        let rendered = self.render_content(store);
+        let rendered = self
+            .cached_render
+            .clone()
+            .unwrap_or_else(|| self.render_content(store));
 
         let line_count = rendered.line_count(area.width);
         self.jump_y_offset = area.height / 2;
