@@ -23,7 +23,7 @@ const TABLE_HORIZ_BORDER: char = '│';
 /// Render the given bbml as best as possible.
 /// Returns the rendered text as a paragraph, and a list of links inside that text
 pub fn render(html: &str) -> (Paragraph<'static>, Vec<String>) {
-    let mut state = RenderState::new(html);
+    let mut state = RenderState::new(&html);
     let (mut text, links) = state.render();
 
     cleanup(&mut text);
@@ -312,11 +312,15 @@ impl<'a> RenderState<'a> {
             }
             // Actual text
             Node::Raw(s) => {
-                let s = collapse_whitespace(&s.as_utf8_str());
-                if !s.contains('\n') {
-                    out.append(Span::styled(s, curr_style));
+                let mut text = String::with_capacity(s.as_utf8_str().len());
+                html_escape::decode_html_entities_to_string(
+                    collapse_whitespace(&s.as_utf8_str()),
+                    &mut text,
+                );
+                if !text.contains('\n') {
+                    out.append(Span::styled(text, curr_style));
                 } else {
-                    for l in s.split('\n') {
+                    for l in text.split('\n') {
                         out.append(Span::styled(l.to_string(), curr_style));
                         out.newline();
                     }
