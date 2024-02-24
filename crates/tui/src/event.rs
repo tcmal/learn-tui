@@ -12,6 +12,7 @@ use crate::store;
 
 /// An event our app may receive
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Event {
     /// Key press.
     Key(KeyEvent),

@@ -58,8 +58,14 @@ impl Worker {
                     .collect::<Vec<_>>();
 
                 let terms = self.client.terms()?;
+                let favourite_ids = self.client.my_favourites()?;
 
-                Ok(Event::Me(me, courses, terms))
+                Ok(Event::Me {
+                    me,
+                    courses,
+                    terms,
+                    favourite_ids,
+                })
             }
             Request::CourseContent {
                 course_idx,

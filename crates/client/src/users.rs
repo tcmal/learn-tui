@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{Client, Result};
@@ -29,4 +31,25 @@ impl Client {
     pub fn me(&self) -> Result<User> {
         self.get("learn/api/v1/users/me")
     }
+
+    /// Get the current user's favourite courses.
+    /// Returns a list of course IDs
+    pub fn my_favourites(&self) -> Result<Vec<String>> {
+        let resp: FavCoursesResp =
+            self.get("learn/api/v1/users/me/preferences/favorite.courses")?;
+        let inner: FavCoursesInner = serde_json::from_str(&resp.value)?;
+
+        Ok(inner
+            .into_iter()
+            .filter(|(_, v)| *v)
+            .map(|(k, _)| k)
+            .collect())
+    }
 }
+
+#[derive(Debug, Deserialize)]
+struct FavCoursesResp {
+    value: String,
+}
+
+type FavCoursesInner = HashMap<String, bool>;

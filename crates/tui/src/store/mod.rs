@@ -69,7 +69,12 @@ pub(crate) enum DownloaderRequest {
 #[derive(Debug)]
 pub enum Event {
     Error(edlearn_client::Error),
-    Me(User, Vec<Course>, Vec<Term>),
+    Me {
+        me: User,
+        courses: Vec<Course>,
+        terms: Vec<Term>,
+        favourite_ids: Vec<String>,
+    },
     CourseContent {
         course_idx: CourseIdx,
         content: Vec<Content>,
@@ -236,12 +241,33 @@ impl Store {
         match e {
             Event::Error(edlearn_client::Error::AuthError(_)) => return Action::Reauthenticate,
             Event::Error(e) => return Action::Flash(error_text(e.to_string())),
-            Event::Me(u, cs, mut terms) => {
-                self.me = Some(u);
+            Event::Me {
+                me,
+                mut courses,
+                mut terms,
+                favourite_ids,
+            } => {
+                self.me = Some(me);
+
+                // pull out favourite courses
+                let mut fav_course_idxs = vec![];
+                for fav in favourite_ids {
+                    let Some((i, c)) = courses.iter_mut().enumerate().find(|(_, c)| c.id == fav)
+                    else {
+                        continue;
+                    };
+
+                    // prevent them showing up under their actual term, because we can't currently deal with duplicates in the navigation view
+                    c.term_id = Some("__fav".to_string());
+                    fav_course_idxs.push(i);
+                }
+                self.courses_by_term
+                    .push(("Favourites".to_string(), fav_course_idxs));
 
                 terms.reverse();
+
                 for term in terms {
-                    let term_courses = cs
+                    let term_courses = courses
                         .iter()
                         .enumerate()
                         .filter(|(_, c)| c.term_id.as_ref().map(|i| *i == term.id).unwrap_or(false))
@@ -253,7 +279,7 @@ impl Store {
                     }
                 }
 
-                self.courses = cs;
+                self.courses = courses;
             }
             Event::CourseContent {
                 course_idx,
