@@ -1,10 +1,24 @@
 //! Renders [BbML](https://blackboard.github.io/rest-apis/learn/advanced/bbml) (a subset of HTML) to styled text for [`ratatui`]
+use log::debug;
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Paragraph, Wrap},
 };
-use tl::{Node, NodeHandle, VDom};
+use tl::{HTMLTag, Node, NodeHandle, VDom};
+
+const SCREEN_WIDTH: usize = 70;
+const TABLE_VERTICAL_BORDER: char = '─';
+const TABLE_MID_LEFT_BORDER: char = '├';
+const TABLE_MID_INTERSECT: char = '┼';
+const TABLE_MID_RIGHT_BORDER: char = '┤';
+const TABLE_TOP_LEFT_BORDER: char = '┌';
+const TABLE_TOP_INTERSECT: char = '┬';
+const TABLE_BOT_INTERSECT: char = '┴';
+const TABLE_TOP_RIGHT_BORDER: char = '┐';
+const TABLE_BOT_LEFT_BORDER: char = '└';
+const TABLE_BOT_RIGHT_BORDER: char = '┘';
+const TABLE_HORIZ_BORDER: char = '│';
 
 /// Render the given bbml as best as possible.
 /// Returns the rendered text as a paragraph, and a list of links inside that text
@@ -78,7 +92,8 @@ impl<'a> RenderState<'a> {
                     }
 
                     // Inline text elements, which at most change the style
-                    "span" | "strong" | "em" | "li" => {
+                    // td is here because we deal with it at the tr level (see further down)
+                    "span" | "strong" | "em" | "li" | "td" | "th" => {
                         let new_style = match tag_name {
                             "strong" => curr_style.add_modifier(Modifier::BOLD),
                             "em" => curr_style.add_modifier(Modifier::ITALIC),
@@ -163,6 +178,125 @@ impl<'a> RenderState<'a> {
                         out.newline();
                     }
 
+                    // Tables
+                    "table" => {
+                        // Render each cell
+                        let mut subtexts: Vec<Vec<Text<'static>>> = vec![];
+                        self.render_table_cells(out, t, &mut subtexts);
+
+                        debug!("{:?}", subtexts);
+
+                        // Ensure table is a square
+                        let max_cols = subtexts.iter().map(Vec::len).max().unwrap_or(0);
+                        subtexts
+                            .iter_mut()
+                            .for_each(|v| v.resize(max_cols, "".into()));
+
+                        // Figure out the dimensions of everything
+                        let mut col_widths = (0..max_cols)
+                            .map(|col_idx| {
+                                subtexts
+                                    .iter()
+                                    .map(|r| &r[col_idx])
+                                    .map(|t| t.width())
+                                    .max()
+                                    .unwrap_or(0)
+                            })
+                            .collect::<Vec<_>>();
+
+                        let total_width = col_widths.iter().sum::<usize>() + col_widths.len() + 1;
+                        let (widest_col_idx, &max_width) = col_widths
+                            .iter()
+                            .enumerate()
+                            .max_by_key(|(_, w)| **w)
+                            .unwrap_or((0, &0));
+                        // Attempt to shrink largest column if we need to
+                        if total_width > SCREEN_WIDTH && max_width > (total_width - SCREEN_WIDTH) {
+                            let new_width = max_width - (total_width - SCREEN_WIDTH);
+                            col_widths[widest_col_idx] = new_width;
+
+                            for row in subtexts.iter_mut() {
+                                wrap_text_to_width(&mut row[widest_col_idx], new_width);
+                            }
+                        }
+
+                        let row_heights = subtexts
+                            .iter()
+                            .map(|row| row.iter().map(|cell| cell.height()).max().unwrap_or(0))
+                            .collect::<Vec<_>>();
+
+                        // Now we can output our table with the right dimensions
+                        out.ensure_line_empty();
+
+                        out.append(table_vertical_border(
+                            &col_widths,
+                            TABLE_TOP_LEFT_BORDER,
+                            TABLE_VERTICAL_BORDER,
+                            TABLE_TOP_INTERSECT,
+                            TABLE_TOP_RIGHT_BORDER,
+                        ));
+                        let n_rows = subtexts.len();
+                        for (row_idx, row) in subtexts.into_iter().enumerate() {
+                            // append however many lines in this row to work with
+                            let row_height = row_heights[row_idx];
+                            let row_start_idx = out.text.lines.len();
+                            (0..row_height).for_each(|_| {
+                                out.text.lines.push(TABLE_HORIZ_BORDER.to_string().into())
+                            });
+
+                            for (col_idx, cell) in row.into_iter().enumerate() {
+                                let col_width = col_widths[col_idx];
+                                let added_to_lines = cell.lines.len();
+
+                                // add to the end of the existing lines, padding if needed
+                                for (line_idx, line) in cell.lines.into_iter().enumerate() {
+                                    let adding_width = line.width();
+                                    let add_to_line = &mut out.text.lines[row_start_idx + line_idx];
+                                    add_to_line.spans.extend(line.spans);
+                                    if adding_width < col_width {
+                                        add_to_line
+                                            .spans
+                                            .push(" ".repeat(col_width - adding_width).into());
+                                    }
+                                }
+
+                                // add space to the missing lines if needed
+                                for i in added_to_lines..row_height {
+                                    out.text.lines[row_start_idx + i]
+                                        .spans
+                                        .push(" ".repeat(col_width).into());
+                                }
+
+                                // add right borders
+                                (0..row_height).for_each(|i| {
+                                    out.text.lines[row_start_idx + i]
+                                        .spans
+                                        .push(TABLE_HORIZ_BORDER.to_string().into())
+                                });
+                            }
+
+                            if row_idx < n_rows - 1 {
+                                out.ensure_line_empty();
+                                out.append(table_vertical_border(
+                                    &col_widths,
+                                    TABLE_MID_LEFT_BORDER,
+                                    TABLE_VERTICAL_BORDER,
+                                    TABLE_MID_INTERSECT,
+                                    TABLE_MID_RIGHT_BORDER,
+                                ));
+                            }
+                        }
+
+                        out.ensure_line_empty();
+                        out.append(table_vertical_border(
+                            &col_widths,
+                            TABLE_BOT_LEFT_BORDER,
+                            TABLE_VERTICAL_BORDER,
+                            TABLE_BOT_INTERSECT,
+                            TABLE_BOT_RIGHT_BORDER,
+                        ));
+                    }
+
                     // Gracefully degrade on unknown tags
                     s => {
                         log::error!("unknown tag: {}", s);
@@ -191,6 +325,96 @@ impl<'a> RenderState<'a> {
             Node::Comment(_) => (),
         }
     }
+
+    fn render_table_cells(
+        &self,
+        out: &mut RenderOutput<'_>,
+        table: &HTMLTag<'_>,
+        cells: &mut Vec<Vec<Text<'static>>>,
+    ) {
+        for row_handle in table.children().top().iter() {
+            match row_handle.get(self.dom.parser()).unwrap() {
+                Node::Tag(row) => match &*row.name().as_utf8_str() {
+                    "thead" | "tbody" => {
+                        self.render_table_cells(out, row, cells);
+                    }
+                    _ => {
+                        let mut cols = vec![];
+                        for cell in row.children().top().iter() {
+                            let mut subtext = Text::default();
+                            let mut suboutp = out.with_subtext(&mut subtext);
+                            self.render_internal(&mut suboutp, cell, Style::new());
+
+                            if subtext.width() == 0 || subtext.height() == 0 {
+                                continue;
+                            }
+                            cleanup(&mut subtext);
+                            cols.push(subtext);
+                        }
+                        if !cols.is_empty() {
+                            cells.push(cols);
+                        }
+                    }
+                },
+                _ => (),
+            };
+        }
+    }
+}
+
+fn wrap_text_to_width(text: &mut Text<'_>, new_width: usize) {
+    let mut i = 0;
+    while i < text.lines.len() {
+        if text.lines[i].width() > new_width {
+            let new_line = chop_after(&mut text.lines[i], new_width);
+            text.lines.insert(i + 1, new_line);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+fn chop_after<'a>(line: &mut Line<'a>, width: usize) -> Line<'a> {
+    let mut cum_width = 0;
+    for i in 0..line.spans.len() {
+        if cum_width + line.spans[i].width() > width {
+            // split current span
+            let keep = width - cum_width;
+            let content = line.spans[i].content.to_owned();
+            line.spans[i].content = content.chars().take(keep).collect::<String>().into();
+
+            let mut new_line = vec![Span::styled(
+                content.chars().skip(keep).collect::<String>(),
+                line.spans[i].style,
+            )];
+            line.spans.drain(i + 1..).for_each(|s| new_line.push(s));
+            return new_line.into();
+        } else {
+            cum_width += line.spans[i].width();
+        }
+    }
+    vec![].into()
+}
+
+fn table_vertical_border(
+    col_widths: &[usize],
+    left: char,
+    straight: char,
+    intersect: char,
+    right: char,
+) -> Span<'static> {
+    let mut out = String::with_capacity(col_widths.iter().sum::<usize>() + col_widths.len() + 1);
+    out.push(left);
+    for (i, &col_width) in col_widths.iter().enumerate() {
+        (0..col_width).for_each(|_| out.push(straight));
+        if i < col_widths.len() - 1 {
+            out.push(intersect);
+        } else {
+            out.push(right);
+        }
+    }
+
+    out.into()
 }
 
 struct RenderOutput<'a> {
