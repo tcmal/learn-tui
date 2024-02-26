@@ -1,6 +1,7 @@
 name: Web
 
 permissions:
+  id-token: write
   contents: write
 
 on:
