@@ -1,7 +1,3 @@
-<div class="oranda-hide">
-# Edinburgh University Learn TUI
-</div>
-
 [![asciicast](https://asciinema.org/a/zVWEplStTzXKpTJCpR1ixVWlX.svg)](https://asciinema.org/a/zVWEplStTzXKpTJCpR1ixVWlX)
 
 A TUI (terminal user interface) for [Edinburgh University's Learn](https://www.learn.ed.ac.uk).
