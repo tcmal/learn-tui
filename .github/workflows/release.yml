@@ -229,12 +229,12 @@ jobs:
           name: artifacts-dist-manifest
           path: dist-manifest.json
 
-  custom-publish.yml:
+  custom-publish:
     needs:
       - plan
       - host
     if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    uses: ./.github/workflows/publish.yml.yml
+    uses: ./.github/workflows/publish.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -248,11 +248,11 @@ jobs:
     needs:
       - plan
       - host
-      - custom-publish.yml
+      - custom-publish
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!
-    if: ${{ always() && needs.host.result == 'success' && (needs.custom-publish.yml.result == 'skipped' || needs.custom-publish.yml.result == 'success') }}
+    if: ${{ always() && needs.host.result == 'success' && (needs.custom-publish.result == 'skipped' || needs.custom-publish.result == 'success') }}
     runs-on: "ubuntu-20.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
