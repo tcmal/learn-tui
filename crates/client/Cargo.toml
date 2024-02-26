@@ -1,6 +1,6 @@
 [package]
 name = "edlearn_client"
-version = "0.0.1"
+version = "0.1.0"
 description = "A client for Edinburgh Uni's Learn API"
 homepage = "https://git.tardisproject.uk/tcmal/learn-tui"
 documentation = "https://docs.rs/edlearn_client"
