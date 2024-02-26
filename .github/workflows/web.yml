@@ -26,12 +26,12 @@ jobs:
           curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/oranda/releases/latest/download/oranda-installer.sh | sh
           cd crates/tui/
           oranda build
-      
-      - name: Deploy to Github Pages
-        uses: JamesIves/github-pages-deploy-action@v4.4.1
-        if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          branch: gh-pages
-          folder: crates/tui/public
-          token: ${{ secrets.GITHUB_TOKEN }}
-          single-commit: true
+          path: 'crates/tui/public'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
