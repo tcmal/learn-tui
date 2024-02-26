@@ -1,0 +1,13 @@
+{
+    "styles": {"theme": "cupcake"},
+    "components": {
+        "artifacts": {
+            "package_managers": {
+                "preferred": {
+                    "cargo": "cargo install edlearn_tui",
+                    "nix flake": "nix profile install github:tcmal/learn-tui"
+                }
+            }
+        }
+    }
+}

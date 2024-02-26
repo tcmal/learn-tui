@@ -1,6 +1,10 @@
+<div class="oranda-hide">
 # Edinburgh University Learn TUI
+</div>
 
-This is a TUI (terminal user interface) for [Edinburgh University's Learn](https://www.learn.ed.ac.uk).
+[![asciicast](https://asciinema.org/a/zVWEplStTzXKpTJCpR1ixVWlX.svg)](https://asciinema.org/a/zVWEplStTzXKpTJCpR1ixVWlX)
+
+A TUI (terminal user interface) for [Edinburgh University's Learn](https://www.learn.ed.ac.uk).
 
 It provides a simple and fast interface for viewing course information and downloading files.
 Submitting assignments and editing courses are explicitly not goals: They are complex and you probably shouldn't trust random programs with your university assignments.
