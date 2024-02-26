@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" id="oranda" class="cupcake">
+  <head>
+    <title>edlearn_tui</title>
+    
+      <meta property="og:url" content="https://git.tardisproject.uk/tcmal/learn-tui" />
+    
+    
+      <link rel="icon" href="/learn-tui/favicon.ico" />
+    
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+      <meta name="description" content="A TUI for Edinburgh Uni's Learn" />
+      <meta property="og:description" content="A TUI for Edinburgh Uni's Learn" />
+    
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="edlearn_tui" />
+    
+    
+    
+    <meta http-equiv="Permissions-Policy" content="interest-cohort=()" />
+    <link rel="stylesheet" href="/learn-tui/oranda-v0.6.1.css" />
+    
+    
+  </head>
+  <body>
+    <div class="container">
+      <div class="page-body">
+        
+          <div class="repo_banner">
+            <a href="https://github.com/tcmal/learn-tui">
+              <div class="github-icon" aria-hidden="true"></div>
+              Check out our GitHub!
+            </a>
+          </div>
+        
+
+        <main>
+          <header>
+            
+            <h1 class="title">edlearn_tui</h1>
+            
+  <nav class="nav">
+    <ul>
+      <li><a href="/learn-tui/">Home</a></li>
+
+      
+
+      
+        <li><a href="/learn-tui/artifacts/">Install</a></li>
+      
+
+      
+
+      
+
+      
+        <li><a href="/learn-tui/changelog/">Changelog</a></li>
+      
+    </ul>
+  </nav>
+
+          </header>
+
+          
+
+
+    <p><a href="https://asciinema.org/a/zVWEplStTzXKpTJCpR1ixVWlX" rel="noopener noreferrer"><img src="https://asciinema.org/a/zVWEplStTzXKpTJCpR1ixVWlX.svg" alt="asciicast"></a></p>
+<p>A TUI (terminal user interface) for <a href="https://www.learn.ed.ac.uk" rel="noopener noreferrer">Edinburgh University's Learn</a>.</p>
+<p>It provides a simple and fast interface for viewing course information and downloading files.
+Submitting assignments and editing courses are explicitly not goals: They are complex and you probably shouldn't trust random programs with your university assignments.</p>
+<p>This could be adapted to work with other systems using Blackboard Learn, but the supported services and authentication process are currently tied to UoE.</p>
+<h2>Usage</h2>
+<p>To use, first install as normal using <code>cargo</code>. Currently only Linux is supported, but other systems should work.
+Run with <code>edlearn_tui</code>.</p>
+<h2>Developing</h2>
+<p>Development is split across several crates:</p>
+<ul>
+<li><code>edlearn_client</code> - Rust wrapper around the web API</li>
+<li><code>bbml</code> - A library for rendering a subset of HTML to be displayed in <code>ratatui</code> applications</li>
+<li><code>edlearn_tui</code> - The main application</li>
+</ul>
+<p>To learn more about the structure of each, check the rustdocs.</p>
+<h2>License</h2>
+<p>Unless otherwise noted, content in this repository is licensed under the GNU GPL v3.0.</p>
+
+
+
+        </main>
+      </div>
+
+      <footer>
+        
+          <a href="https://github.com/tcmal/learn-tui"><div class="github-icon" aria-hidden="true"></div></a>
+        
+        <span>
+          edlearn_tui, GPL-3.0-only
+        </span>
+      </footer>
+    </div>
+
+    
+    
+
+    
+
+    <script src="/learn-tui/artifacts.js"></script>
+
+
+  </body>
+</html>
