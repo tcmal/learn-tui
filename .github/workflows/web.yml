@@ -19,13 +19,16 @@ jobs:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
+
       - name: Install and run oranda
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/oranda/releases/latest/download/oranda-installer.sh | sh
+          cd crates/tui/
           oranda build
       
       - name: Deploy to Github Pages
         uses: JamesIves/github-pages-deploy-action@v4.4.1
+        if: ${{ github.ref == 'refs/heads/main' }}
         with:
           branch: gh-pages
           folder: public
