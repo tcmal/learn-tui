@@ -13,9 +13,7 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      BUILD_MANIFEST_NAME: target/distrib/${{ join(matrix.targets, '-') }}-dist-manifest.json
     steps:
-      - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
 
       - name: cargo-release Cache
@@ -30,6 +28,8 @@ jobs:
 
       - name: cargo login
         run: cargo login ${{ secrets.CRATES_IO_API_TOKEN }}
+
+      - uses: actions/checkout@v3
 
       # allow-branch HEAD is because GitHub actions switches
       # to the tag while building, which is a detached head
