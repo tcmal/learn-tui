@@ -4,10 +4,17 @@ version = "0.0.1"
 description = "A TUI for Edinburgh Uni's Learn"
 homepage = "https://git.tardisproject.uk/tcmal/learn-tui"
 documentation = "https://docs.rs/edlearn_tui"
-repository = "https://git.tardisproject.uk/tcmal/learn-tui"
+repository = "https://github.com/tcmal/learn-tui"
+authors = ["Aria Shrimpton <me@aria.rip>"]
 readme = "../../README.md"
 edition = "2021"
 license = "GPL-3.0-only"
+
+[package.metadata.wix]
+upgrade-guid = "4FD186A3-6BEA-4D4D-8883-B2B34F1FF1DB"
+path-guid = "F23467ED-E9B4-4DA3-ABB5-AA78E1770B74"
+license = false
+eula = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
