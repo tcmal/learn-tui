@@ -9,36 +9,21 @@ on:
 
 jobs:
   publish-crates-io:
-    name: publish-crates-io
-    runs-on: ubuntu-20.04
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: ubuntu-latest
     steps:
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: cargo-release Cache
-        id: cargo_release_cache
-        uses: actions/cache@v3
+      - name: Checkout sources
+        uses: actions/checkout@v3
         with:
-          path: ~/.cargo/bin/cargo-release
-          key: ${{ runner.os }}-cargo-release
-
-      - run: cargo install cargo-release
-        if: steps.cargo_release_cache.outputs.cache-hit != 'true'
+          ref: main
+          fetch-depth: 0
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: cargo login
         run: cargo login ${{ secrets.CRATES_IO_API_TOKEN }}
 
-      - uses: actions/checkout@v3
-
-      # allow-branch HEAD is because GitHub actions switches
-      # to the tag while building, which is a detached head
-      - name: "cargo release publish"
-        run: |-
-          cargo release \
-            publish \
-            --workspace \
-            --allow-branch HEAD \
-            --no-confirm \
-            --no-verify \
-            --execute
+      - run: cargo publish -p edlearn_client --no-verify --allow-dirty
+      - run: cargo publish -p bbml --no-verify --allow-dirty
+      - run: cargo publish -p edlearn_tui --no-verify --allow-dirty
