@@ -20,10 +20,10 @@ eula = false
 
 [dependencies]
 anyhow = "1.0.76"
-bbml = { version = "0.1.1", path = "../bbml" }
+bbml = { version = "0.2.0", path = "../bbml" }
 camino = "1.1.6"
 crossterm = "0.27.0"
-edlearn_client = { version = "0.1.1", path = "../client" }
+edlearn_client = { version = "0.2.0", path = "../client" }
 log = { workspace = true }
 open = "5.0.1"
 ratatui = { workspace = true }
