@@ -89,6 +89,7 @@ impl Content {
             // This is fixed by adding `&from_ultra=true`, as learn ultra does.
             Some(ContentDetail::Piazza { launch_link }) => ContentPayload::Piazza(format!("{}{}&from_ultra=true", LEARN_BASE, launch_link)),
             Some(ContentDetail::MediaHopperReplay { launch_link }) => ContentPayload::MediaHopperReplay(format!("{}{}&from_ultra=true", LEARN_BASE, launch_link)),
+            Some(ContentDetail::Zoom { launch_link }) => ContentPayload::Zoom(format!("{}{}&from_ultra=true", LEARN_BASE, launch_link)),
             Some(ContentDetail::Unknown {}) | None => ContentPayload::Other,
         };
 
@@ -114,7 +115,8 @@ impl Content {
             ContentPayload::Link(link) => link,
             ContentPayload::File { permanent_url, .. } => permanent_url,
             ContentPayload::Piazza(u)
-            | ContentPayload::MediaHopperReplay(u) => u,
+            | ContentPayload::MediaHopperReplay(u)
+            | ContentPayload::Zoom(u) => u,
             _ => &self.link,
         }
     }
@@ -147,6 +149,9 @@ pub enum ContentPayload {
 
     /// Link to a media hopper replay class. Payload is the link to open to authenticate then redirect to it.
     MediaHopperReplay(String),
+
+    /// Link to a zoom recordings list.
+    Zoom(String),
 }
 
 #[derive(Deserialize)]
@@ -209,6 +214,10 @@ enum ContentDetail {
     #[serde(rename = "resource/x-bb-bltiplacement-mhrlti")]
     #[serde(rename_all = "camelCase")]
     MediaHopperReplay { launch_link: String },
+
+    #[serde(rename = "resource/x-bb-bltiplacement-zoom")]
+    #[serde(rename_all = "camelCase")]
+    Zoom { launch_link: String },
 
     #[serde(untagged)]
     Unknown {},

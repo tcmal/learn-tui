@@ -73,6 +73,10 @@ impl ContentViewer {
                 self.cached_render = Some(Paragraph::new(format!("Link to media hopper replay. Open with b")));
                 self.cached_render.clone().unwrap()
             },
+            ContentPayload::Zoom(_) => {
+                self.cached_render = Some(Paragraph::new(format!("Link to zoom recording list. Open with b")));
+                self.cached_render.clone().unwrap()
+            },
             ContentPayload::Folder => {
                 self.cached_render = Some(Paragraph::new("Folder"));
                 self.cached_render.clone().unwrap()
