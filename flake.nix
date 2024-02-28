@@ -19,7 +19,7 @@
     in {
       packages.default = craneLib.buildPackage {
         pname = "edlearn_tui";
-        version = "0.0.1";
+        version = "0.2.0";
 
         src = craneLib.cleanCargoSource (craneLib.path ./.);
         doCheck = false;
