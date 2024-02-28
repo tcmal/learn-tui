@@ -65,16 +65,8 @@ impl ContentViewer {
                 self.cached_render = Some(Paragraph::new(format!("Link to {}. Open with b", l)));
                 self.cached_render.clone().unwrap()
             }
-            ContentPayload::Piazza(_) => {
-                self.cached_render = Some(Paragraph::new(format!("Link to a Piazza forum. Open with b")));
-                self.cached_render.clone().unwrap()
-            },
-            ContentPayload::MediaHopperReplay(_) => {
-                self.cached_render = Some(Paragraph::new(format!("Link to media hopper replay. Open with b")));
-                self.cached_render.clone().unwrap()
-            },
-            ContentPayload::Zoom(_) => {
-                self.cached_render = Some(Paragraph::new(format!("Link to zoom recording list. Open with b")));
+            ContentPayload::Placement { name, .. } => {
+                self.cached_render = Some(Paragraph::new(format!("Link to {}. Open with b", name)));
                 self.cached_render.clone().unwrap()
             },
             ContentPayload::Folder => {

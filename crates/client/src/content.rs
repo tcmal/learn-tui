@@ -87,9 +87,24 @@ impl Content {
             },
             // The returned URL is relative to the learn base, and is normally broken and shows the old learn interface nested a bunch of times
             // This is fixed by adding `&from_ultra=true`, as learn ultra does.
-            Some(ContentDetail::Piazza { launch_link }) => ContentPayload::Piazza(format!("{}{}&from_ultra=true", LEARN_BASE, launch_link)),
-            Some(ContentDetail::MediaHopperReplay { launch_link }) => ContentPayload::MediaHopperReplay(format!("{}{}&from_ultra=true", LEARN_BASE, launch_link)),
-            Some(ContentDetail::Zoom { launch_link }) => ContentPayload::Zoom(format!("{}{}&from_ultra=true", LEARN_BASE, launch_link)),
+            Some(ContentDetail::Piazza { launch_link }) => ContentPayload::Placement {
+                name: "Piazza",
+                url: format!("{}{}&from_ultra=true", LEARN_BASE, launch_link),
+            },
+            Some(ContentDetail::MediaHopperReplay { launch_link }) => {
+                ContentPayload::Placement {
+                    name: "Media Hopper Replay",
+                    url: format!(
+                    "{}{}&from_ultra=true",
+                    LEARN_BASE, launch_link
+                )}
+            }
+            Some(ContentDetail::Zoom { launch_link }) => {
+                ContentPayload::Placement {
+                    name: "Zoom",
+                    url: format!("{}{}&from_ultra=true", LEARN_BASE, launch_link), 
+                }
+            }
             Some(ContentDetail::Unknown {}) | None => ContentPayload::Other,
         };
 
@@ -114,9 +129,7 @@ impl Content {
         match &self.payload {
             ContentPayload::Link(link) => link,
             ContentPayload::File { permanent_url, .. } => permanent_url,
-            ContentPayload::Piazza(u)
-            | ContentPayload::MediaHopperReplay(u)
-            | ContentPayload::Zoom(u) => u,
+            ContentPayload::Placement { url, .. } => url,
             _ => &self.link,
         }
     }
@@ -144,14 +157,9 @@ pub enum ContentPayload {
         permanent_url: String,
     },
 
-    /// Link to a piazza forum. Payload is the link to open to authenticate then redirect to it.
-    Piazza(String),
-
-    /// Link to a media hopper replay class. Payload is the link to open to authenticate then redirect to it.
-    MediaHopperReplay(String),
-
-    /// Link to a zoom recordings list.
-    Zoom(String),
+    /// Link to a placement in some other application.
+    /// URL will authenticate and then redirect the user.
+    Placement { name: &'static str, url: String },
 }
 
 #[derive(Deserialize)]
