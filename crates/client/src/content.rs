@@ -85,6 +85,9 @@ impl Content {
                     permanent_url.strip_prefix('/').unwrap()
                 ),
             },
+            // The returned URL is relative to the learn base, and is normally broken and shows the old learn interface nested a bunch of times
+            // This is fixed by adding `&from_ultra=true`, as learn ultra does.
+            Some(ContentDetail::Piazza { launch_link }) => ContentPayload::Piazza(format!("{}{}&from_ultra=true", LEARN_BASE, launch_link)),
             Some(ContentDetail::Unknown {}) | None => ContentPayload::Other,
         };
 
@@ -109,6 +112,7 @@ impl Content {
         match &self.payload {
             ContentPayload::Link(link) => link,
             ContentPayload::File { permanent_url, .. } => permanent_url,
+            ContentPayload::Piazza(u) => u,
             _ => &self.link,
         }
     }
@@ -135,6 +139,9 @@ pub enum ContentPayload {
         file_name: String,
         permanent_url: String,
     },
+
+    /// Link to a piazza forum. Payload is the link to open to authenticate then redirect to it.
+    Piazza(String),
 }
 
 #[derive(Deserialize)]
@@ -189,6 +196,10 @@ enum ContentDetail {
 
     #[serde(rename = "resource/x-bb-file")]
     File { file: RawFile },
+
+    #[serde(rename = "resource/x-bb-bltiplacement-49f1179af0494f078ce3ff737dd75de4")]
+    #[serde(rename_all = "camelCase")]
+    Piazza { launch_link: String },
 
     #[serde(untagged)]
     Unknown {},
