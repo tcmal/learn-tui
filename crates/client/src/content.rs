@@ -100,6 +100,10 @@ impl Content {
                 name: "Zoom",
                 url: format!("{}{}&from_ultra=true", LEARN_BASE, launch_link),
             },
+            Some(ContentDetail::Gradescope { launch_link }) => ContentPayload::Placement {
+                name: "Gradescope",
+                url: format!("{}{}&from_ultra=true", LEARN_BASE, launch_link),
+            },
             Some(ContentDetail::Assessment { test }) => ContentPayload::Assessment {
                 name: test.grading_column.effective_column_name,
                 due_date: test.grading_column.due_date,
@@ -219,6 +223,9 @@ enum ContentDetail {
     #[serde(rename = "resource/x-bb-file")]
     File { file: RawFile },
 
+    // TODO: Right now we add placement UUIDs manually and map them to friendly names above
+    // It would probably be cleaner to deserialise all handlers which look like resource/x-bb-blti-placement-*,
+    // and use placement.name to fix this once and for all.
     #[serde(rename = "resource/x-bb-bltiplacement-49f1179af0494f078ce3ff737dd75de4")]
     #[serde(rename_all = "camelCase")]
     Piazza { launch_link: String },
@@ -230,6 +237,10 @@ enum ContentDetail {
     #[serde(rename = "resource/x-bb-bltiplacement-zoom")]
     #[serde(rename_all = "camelCase")]
     Zoom { launch_link: String },
+
+    #[serde(rename = "resource/x-bb-bltiplacement-gradescope")]
+    #[serde(rename_all = "camelCase")]
+    Gradescope { launch_link: String },
 
     #[serde(rename = "resource/x-bb-asmt-test-link")]
     #[serde(rename_all = "camelCase")]
