@@ -31,4 +31,3 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 simplelog = "0.12.1"
 tui-tree-widget = "0.16.0"
-xdg = "2.5.2"
