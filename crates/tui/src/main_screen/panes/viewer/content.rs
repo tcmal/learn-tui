@@ -68,7 +68,7 @@ impl ContentViewer {
             ContentPayload::Placement { name, .. } => {
                 self.cached_render = Some(Paragraph::new(format!("Link to {}. Open with b", name)));
                 self.cached_render.clone().unwrap()
-            },
+            }
             ContentPayload::Folder => {
                 self.cached_render = Some(Paragraph::new("Folder"));
                 self.cached_render.clone().unwrap()
@@ -103,6 +103,13 @@ impl ContentViewer {
                     self.cached_render = Some(Paragraph::new(ls.clone()));
                 }
                 Paragraph::new(ls)
+            }
+            ContentPayload::Assessment { name, due_date } => {
+                self.cached_render = Some(Paragraph::new(vec![
+                    format!("Assessment: {}", name).into(),
+                    format!("Due: {}", due_date).into(),
+                ]));
+                self.cached_render.clone().unwrap()
             }
             ContentPayload::Other => {
                 self.cached_render = Some(Paragraph::new(vec![

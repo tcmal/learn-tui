@@ -2,6 +2,7 @@
 
   - Windows support and builds
   - Show links to Piazza, Media Hopper Replay (lecture recordings), and Zoom correctly
+  - Show assessment titles & due dates
 
 # Version 0.1.1
 

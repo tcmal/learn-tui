@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use serde::{
     de::{self, MapAccess, Visitor},
     Deserialize, Deserializer,
@@ -91,20 +92,18 @@ impl Content {
                 name: "Piazza",
                 url: format!("{}{}&from_ultra=true", LEARN_BASE, launch_link),
             },
-            Some(ContentDetail::MediaHopperReplay { launch_link }) => {
-                ContentPayload::Placement {
-                    name: "Media Hopper Replay",
-                    url: format!(
-                    "{}{}&from_ultra=true",
-                    LEARN_BASE, launch_link
-                )}
-            }
-            Some(ContentDetail::Zoom { launch_link }) => {
-                ContentPayload::Placement {
-                    name: "Zoom",
-                    url: format!("{}{}&from_ultra=true", LEARN_BASE, launch_link), 
-                }
-            }
+            Some(ContentDetail::MediaHopperReplay { launch_link }) => ContentPayload::Placement {
+                name: "Media Hopper Replay",
+                url: format!("{}{}&from_ultra=true", LEARN_BASE, launch_link),
+            },
+            Some(ContentDetail::Zoom { launch_link }) => ContentPayload::Placement {
+                name: "Zoom",
+                url: format!("{}{}&from_ultra=true", LEARN_BASE, launch_link),
+            },
+            Some(ContentDetail::Assessment { test }) => ContentPayload::Assessment {
+                name: test.grading_column.effective_column_name,
+                due_date: test.grading_column.due_date,
+            },
             Some(ContentDetail::Unknown {}) | None => ContentPayload::Other,
         };
 
@@ -160,6 +159,11 @@ pub enum ContentPayload {
     /// Link to a placement in some other application.
     /// URL will authenticate and then redirect the user.
     Placement { name: &'static str, url: String },
+
+    Assessment {
+        name: String,
+        due_date: DateTime<Local>,
+    },
 }
 
 #[derive(Deserialize)]
@@ -227,6 +231,10 @@ enum ContentDetail {
     #[serde(rename_all = "camelCase")]
     Zoom { launch_link: String },
 
+    #[serde(rename = "resource/x-bb-asmt-test-link")]
+    #[serde(rename_all = "camelCase")]
+    Assessment { test: RawTest },
+
     #[serde(untagged)]
     Unknown {},
 }
@@ -237,6 +245,19 @@ struct RawFile {
     mime_type: String,
     file_name: String,
     permanent_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawTest {
+    grading_column: RawGradingColumn,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawGradingColumn {
+    effective_column_name: String,
+    due_date: DateTime<Local>,
 }
 
 fn raw_body_str_or_struct<'de, D>(deserializer: D) -> Result<Option<RawContentBody>, D::Error>
