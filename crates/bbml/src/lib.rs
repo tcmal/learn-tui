@@ -23,7 +23,7 @@ const TABLE_HORIZ_BORDER: char = '│';
 /// Render the given bbml as best as possible.
 /// Returns the rendered text as a paragraph, and a list of links inside that text
 pub fn render(html: &str) -> (Paragraph<'static>, Vec<String>) {
-    let mut state = RenderState::new(&html);
+    let mut state = RenderState::new(html);
     let (mut text, links) = state.render();
 
     cleanup(&mut text);
@@ -337,8 +337,8 @@ impl<'a> RenderState<'a> {
         cells: &mut Vec<Vec<Text<'static>>>,
     ) {
         for row_handle in table.children().top().iter() {
-            match row_handle.get(self.dom.parser()).unwrap() {
-                Node::Tag(row) => match &*row.name().as_utf8_str() {
+            if let Node::Tag(row) = row_handle.get(self.dom.parser()).unwrap() {
+                match &*row.name().as_utf8_str() {
                     "thead" | "tbody" => {
                         self.render_table_cells(out, row, cells);
                     }
@@ -359,9 +359,8 @@ impl<'a> RenderState<'a> {
                             cells.push(cols);
                         }
                     }
-                },
-                _ => (),
-            };
+                }
+            }
         }
     }
 }
@@ -384,7 +383,7 @@ fn chop_after<'a>(line: &mut Line<'a>, width: usize) -> Line<'a> {
         if cum_width + line.spans[i].width() > width {
             // split current span
             let keep = width - cum_width;
-            let content = line.spans[i].content.to_owned();
+            let content = line.spans[i].content.clone();
             line.spans[i].content = content.chars().take(keep).collect::<String>().into();
 
             let mut new_line = vec![Span::styled(
