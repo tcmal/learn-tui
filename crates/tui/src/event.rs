@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
+use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, KeyEventKind, MouseEvent};
 use log::debug;
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -95,7 +95,9 @@ impl EventBus {
         loop {
             if event::poll(Duration::from_millis(250)).expect("unable to poll for events") {
                 match event::read().expect("unable to read event") {
-                    CrosstermEvent::Key(e) => sender.send(Event::Key(e)),
+                    CrosstermEvent::Key(e) if e.kind == KeyEventKind::Press => {
+                        sender.send(Event::Key(e))
+                    }
                     CrosstermEvent::Mouse(e) => sender.send(Event::Mouse(e)),
                     CrosstermEvent::Resize(w, h) => sender.send(Event::Resize(w, h)),
                     _ => Ok(()),
