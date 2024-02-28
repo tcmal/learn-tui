@@ -1,7 +1,7 @@
 # Version 0.2.0
 
   - Windows support and builds
-  - Show links to piazza correctly
+  - Show links to Piazza and Media Hopper Replay (lecture recordings) correctly
 
 # Version 0.1.1
 

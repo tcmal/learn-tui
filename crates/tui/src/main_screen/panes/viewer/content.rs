@@ -69,6 +69,10 @@ impl ContentViewer {
                 self.cached_render = Some(Paragraph::new(format!("Link to a Piazza forum. Open with b")));
                 self.cached_render.clone().unwrap()
             },
+            ContentPayload::MediaHopperReplay(_) => {
+                self.cached_render = Some(Paragraph::new(format!("Link to media hopper replay. Open with b")));
+                self.cached_render.clone().unwrap()
+            },
             ContentPayload::Folder => {
                 self.cached_render = Some(Paragraph::new("Folder"));
                 self.cached_render.clone().unwrap()
